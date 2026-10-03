@@ -560,19 +560,13 @@ export default function RbacAdminPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Assign role to user
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-[1.3fr_1fr_auto]">
-          <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="User UUID"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Role permission matrix
+          </p>
           <select
-            value={selectedRoleId}
-            onChange={(e) => setSelectedRoleId(e.target.value)}
+            value={selectedRoleForMatrix}
+            onChange={(e) => setSelectedRoleForMatrix(e.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
           >
             <option value="">Choose role</option>
@@ -582,36 +576,94 @@ export default function RbacAdminPage() {
               </option>
             ))}
           </select>
-          <Button type="button" onClick={() => void assignRoleToUser()}>
-            Assign
-          </Button>
         </div>
-        {assignMessage ? <p className="mt-3 text-sm text-slate-700">{assignMessage}</p> : null}
-      </div>
 
-      <div className="space-y-4">
-        {roles.map((role) => (
-          <div key={role.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-900">{role.name}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{role.code}</p>
-              </div>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                {role.isSystem ? "System" : "Custom"}
-              </span>
+        {selectedRoleForMatrix && permissionDrafts.length > 0 ? (
+          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Module</th>
+                    <th className="px-4 py-3 font-medium">Functionality</th>
+                    <th className="px-4 py-3 font-medium">Action</th>
+                    <th className="px-4 py-3 font-medium">View</th>
+                    <th className="px-4 py-3 font-medium">Create</th>
+                    <th className="px-4 py-3 font-medium">Edit</th>
+                    <th className="px-4 py-3 font-medium">Delete</th>
+                    <th className="px-4 py-3 font-medium">Approve</th>
+                    <th className="px-4 py-3 font-medium">Configure</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {permissionDrafts.map((row) => (
+                    <tr key={row.functionalityId}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-800">{row.moduleName}</div>
+                        <div className="text-xs text-slate-500">{row.subModuleName}</div>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-800">{row.functionalityName}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.action}</td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canView}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canView", e.target.checked)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canCreate}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canCreate", e.target.checked)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canEdit}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canEdit", e.target.checked)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canDelete}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canDelete", e.target.checked)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canApprove}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canApprove", e.target.checked)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.canConfigure}
+                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canConfigure", e.target.checked)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-              {role.category ? <span className="rounded-full bg-white px-2 py-1">{role.category}</span> : null}
-              {role.baselineAccessLevel ? (
-                <span className="rounded-full bg-white px-2 py-1">Baseline: {role.baselineAccessLevel.name}</span>
-              ) : null}
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => void saveRolePermissions()}>
+                Save permissions
+              </Button>
             </div>
-
-            {renderRoleActions(role)}
           </div>
-        ))}
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
+            Select a role to view and edit its permission matrix.
+          </div>
+        )}
+
+        {matrixMessage ? <p className="mt-3 text-sm text-slate-700">{matrixMessage}</p> : null}
       </div>
     </div>
   );

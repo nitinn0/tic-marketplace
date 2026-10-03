@@ -4,13 +4,18 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && npm run start:prod
+    buildCommand: |
+      npm install
+      npx prisma generate
+      npm run build
+    startCommand: |
+      npx prisma migrate deploy
+      npm run start:prod
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 4011
+        value: "4011"
       - key: DATABASE_URL
         fromDatabase:
           name: tic-db
@@ -22,22 +27,25 @@ services:
       - key: JWT_REFRESH_TTL
         value: 7d
       - key: JWT_EXPIRES_IN
-        value: 900
+        value: "900"
 
   - type: web
     name: tic-frontend
     runtime: node
     rootDir: frontend
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm run start -- --hostname 0.0.0.0 --port $PORT
+    buildCommand: |
+      npm install
+      npm run build
+    startCommand: |
+      npm run start -- --hostname 0.0.0.0 --port $PORT
     envVars:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
         value: https://tic-backend.onrender.com/api/v1
 
- databases:
+databases:
   - name: tic-db
     databaseName: tic_marketplace_prod
     user: tic_user

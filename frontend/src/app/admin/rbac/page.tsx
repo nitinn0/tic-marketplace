@@ -54,6 +54,49 @@ type Role = {
   isActive: boolean;
 };
 
+type RolePermissionEntry = {
+  id?: string;
+  functionalityId: string;
+  accessLevelId?: string | null;
+  canView?: boolean | null;
+  canCreate?: boolean | null;
+  canEdit?: boolean | null;
+  canDelete?: boolean | null;
+  canApprove?: boolean | null;
+  canConfigure?: boolean | null;
+  functionality?: {
+    id: string;
+    code: string;
+    name: string;
+    action: string;
+    subModule?: {
+      id: string;
+      name: string;
+      module?: {
+        id: string;
+        name: string;
+      };
+    };
+  };
+  accessLevel?: { id: string; name: string; code: string } | null;
+};
+
+type PermissionDraft = {
+  functionalityId: string;
+  functionalityCode: string;
+  functionalityName: string;
+  action: string;
+  moduleName: string;
+  subModuleName: string;
+  accessLevelId: string | null;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canApprove: boolean;
+  canConfigure: boolean;
+};
+
 export default function RbacAdminPage() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["key"]>("modules");
   const [modules, setModules] = useState<ModuleEntity[]>([]);
@@ -621,6 +664,100 @@ export default function RbacAdminPage() {
       </div>
     </div>
   );
+
+  const [selectedRolePermissions, setSelectedRolePermissions] = useState<RolePermissionEntry[]>([]);
+  const [selectedRoleForMatrix, setSelectedRoleForMatrix] = useState<string>("");
+  const [permissionDrafts, setPermissionDrafts] = useState<PermissionDraft[]>([]);
+  const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedRoleForMatrix && roles[0]) {
+      setSelectedRoleForMatrix(roles[0].id);
+    }
+  }, [roles, selectedRoleForMatrix]);
+
+  useEffect(() => {
+    if (!selectedRoleForMatrix) {
+      setSelectedRolePermissions([]);
+      setPermissionDrafts([]);
+      return;
+    }
+    void loadRolePermissions(selectedRoleForMatrix);
+  }, [selectedRoleForMatrix]);
+
+  const loadRolePermissions = async (roleId: string) => {
+    if (!roleId) {
+      setSelectedRolePermissions([]);
+      setPermissionDrafts([]);
+      return;
+    }
+
+    try {
+      const payload = await api.get<RolePermissionEntry[]>(`/rbac/roles/${roleId}/permissions`);
+      setSelectedRolePermissions(payload);
+
+      const flattened = payload.map((entry) => ({
+        functionalityId: entry.functionalityId,
+        functionalityCode: entry.functionality?.code ?? "",
+        functionalityName: entry.functionality?.name ?? "",
+        action: entry.functionality?.action ?? "",
+        moduleName: entry.functionality?.subModule?.module?.name ?? "",
+        subModuleName: entry.functionality?.subModule?.name ?? "",
+        accessLevelId: entry.accessLevelId ?? null,
+        canView: Boolean(entry.canView),
+        canCreate: Boolean(entry.canCreate),
+        canEdit: Boolean(entry.canEdit),
+        canDelete: Boolean(entry.canDelete),
+        canApprove: Boolean(entry.canApprove),
+        canConfigure: Boolean(entry.canConfigure),
+      }));
+
+      setPermissionDrafts(flattened);
+    } catch (err) {
+      setMatrixMessage(err instanceof Error ? err.message : "Unable to load role permissions.");
+    }
+  };
+
+  const syncPermissionToggle = (
+    functionalityId: string,
+    flag: "canView" | "canCreate" | "canEdit" | "canDelete" | "canApprove" | "canConfigure",
+    value: boolean,
+  ) => {
+    setPermissionDrafts((current) =>
+      current.map((item) =>
+        item.functionalityId === functionalityId
+          ? { ...item, [flag]: value }
+          : item,
+      ),
+    );
+  };
+
+  const saveRolePermissions = async () => {
+    if (!selectedRoleForMatrix) {
+      setMatrixMessage("Select a role before saving permissions.");
+      return;
+    }
+
+    try {
+      setMatrixMessage(null);
+      await api.put(`/rbac/roles/${selectedRoleForMatrix}/permissions`, {
+        permissions: permissionDrafts.map((item) => ({
+          functionalityId: item.functionalityId,
+          accessLevelId: item.accessLevelId ?? undefined,
+          canView: item.canView,
+          canCreate: item.canCreate,
+          canEdit: item.canEdit,
+          canDelete: item.canDelete,
+          canApprove: item.canApprove,
+          canConfigure: item.canConfigure,
+        })),
+      });
+      setMatrixMessage("Role permissions saved successfully.");
+      await loadRolePermissions(selectedRoleForMatrix);
+    } catch (err) {
+      setMatrixMessage(err instanceof Error ? err.message : "Unable to save role permissions.");
+    }
+  };
 
   return (
     <Container className="py-10">

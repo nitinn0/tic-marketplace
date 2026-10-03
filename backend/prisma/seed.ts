@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -170,6 +171,57 @@ async function assignRoleToUser(userEmail: string, roleCode: string) {
   });
 }
 
+async function upsertSupabaseAuthUser(
+  email: string,
+  password: string,
+  firstName: string,
+  lastName: string,
+) {
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    console.warn('Skipping Supabase Auth user seed: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    return;
+  }
+
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  const { data, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.warn('Unable to list Supabase Auth users:', listError.message);
+    return;
+  }
+
+  const existing = data.users.find((user) => user.email === email);
+  if (existing) {
+    const { error } = await supabase.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      user_metadata: { first_name: firstName, last_name: lastName },
+    });
+    if (error) {
+      console.warn('Unable to update Supabase Auth user:', error.message);
+    }
+    return;
+  }
+
+  const { error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { first_name: firstName, last_name: lastName },
+  });
+  if (error) {
+    console.warn('Unable to create Supabase Auth user:', error.message);
+  }
+}
+
 async function upsertUser(email: string, firstName: string, lastName: string, password: string) {
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -248,6 +300,7 @@ async function main() {
   const userRole = await upsertRole('USER', 'User', viewerLevel.id, 'platform');
 
   const superAdminUser = await upsertUser('bob+auth@example.com', 'Bob', 'Auth', 'password123');
+  await upsertSupabaseAuthUser('bob+auth@example.com', 'password123', 'Bob', 'Auth');
 
   await assignRoleToUser(superAdminUser.email, 'SUPER_ADMIN');
   await assignRoleToUser('alice+test@example.com', 'USER');

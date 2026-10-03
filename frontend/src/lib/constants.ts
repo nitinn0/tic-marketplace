@@ -1,7 +1,8 @@
+import { getApiBaseUrl } from "@/lib/api";
+
 export const appName = "TIC Marketplace";
 
-export const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4011/api/v1";
+export const apiBaseUrl = getApiBaseUrl();
 
 export const routes = {
   home: "/",

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, getApiBaseUrl } from "@/lib/api";
 import { signInWithEmail } from "@/lib/supabase-auth";
 import { routes } from "@/lib/constants";
 
@@ -34,24 +34,31 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const authData = await signInWithEmail(email, password).catch(() => null);
+      try {
+        const authData = await signInWithEmail(email, password);
 
-      if (authData?.session) {
-        window.localStorage.setItem("tic_access_token", authData.session.access_token);
-        window.localStorage.setItem("tic_refresh_token", authData.session.refresh_token);
-        window.localStorage.setItem(
-          "tic_user",
-          JSON.stringify({
-            id: authData.user?.id ?? "supabase-user",
-            email: authData.user?.email ?? email,
-            firstName: "Supabase",
-            lastName: "User",
-            status: "ACTIVE",
-          }),
-        );
-        router.push(routes.dashboard);
-        router.refresh();
-        return;
+        if (authData.session) {
+          const metadata = authData.user?.user_metadata ?? {};
+          window.localStorage.setItem("tic_access_token", authData.session.access_token);
+          window.localStorage.setItem("tic_refresh_token", authData.session.refresh_token);
+          window.localStorage.setItem(
+            "tic_user",
+            JSON.stringify({
+              id: authData.user?.id ?? "supabase-user",
+              email: authData.user?.email ?? email,
+              firstName: metadata.first_name ?? "Bob",
+              lastName: metadata.last_name ?? "Auth",
+              status: "ACTIVE",
+            }),
+          );
+          router.push(routes.dashboard);
+          router.refresh();
+          return;
+        }
+      } catch (supabaseError) {
+        if (!getApiBaseUrl()) {
+          throw supabaseError;
+        }
       }
 
       const result = await api.post<LoginResponse>("/auth/login", { email, password });

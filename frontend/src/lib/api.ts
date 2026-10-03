@@ -1,5 +1,39 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4011/api/v1";
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+function isLoopbackApiUrl(url: string) {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+function isBrowserOnRemoteHost() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const { hostname } = window.location;
+  return hostname !== "localhost" && hostname !== "127.0.0.1";
+}
+
+export function getApiBaseUrl() {
+  if (configuredApiUrl && !isLoopbackApiUrl(configuredApiUrl)) {
+    return configuredApiUrl;
+  }
+
+  if (isBrowserOnRemoteHost()) {
+    return "";
+  }
+
+  return configuredApiUrl || "http://localhost:4011/api/v1";
+}
+
+export function isRemoteApiConfigured() {
+  const url = getApiBaseUrl();
+  return Boolean(url) && !isLoopbackApiUrl(url);
+}
 
 function getStoredAuthToken() {
   if (typeof window === "undefined") {
@@ -13,7 +47,12 @@ async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const apiBaseUrl = getApiBaseUrl();
+  if (!apiBaseUrl) {
+    throw new Error("API is not configured for this environment.");
+  }
+
+  const url = `${apiBaseUrl}${endpoint}`;
   const token = getStoredAuthToken();
 
   const response = await fetch(url, {

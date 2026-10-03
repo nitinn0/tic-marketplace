@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { getStoredSession, clearSession } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { api, getApiBaseUrl } from "@/lib/api";
 
 function StatCard({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "success" | "warning" }) {
   const tones = {
@@ -66,8 +66,26 @@ export default function DashboardPage() {
           return;
         }
 
-        const payload = await api.get<MeResponse>("/auth/me");
-        setMe(payload);
+        const sessionProfile: MeResponse = {
+          user: {
+            ...session.user,
+            phone: null,
+          },
+          roles: [],
+          permissions: [],
+        };
+
+        if (!getApiBaseUrl()) {
+          setMe(sessionProfile);
+          return;
+        }
+
+        try {
+          const payload = await api.get<MeResponse>("/auth/me");
+          setMe(payload);
+        } catch {
+          setMe(sessionProfile);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to load dashboard.");
       } finally {

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
-import api from "@/lib/api";
+import api, { getApiBaseUrl } from "@/lib/api";
 import { useEffect, useState } from "react";
 import type { HealthStatus } from "@/types";
 
@@ -12,6 +12,11 @@ export default function Home() {
 
   useEffect(() => {
     const loadHealth = async () => {
+      if (!getApiBaseUrl()) {
+        setError("API not configured for this deployment");
+        return;
+      }
+
       try {
         const response = await api.get<HealthStatus>("/health");
         setHealth(response);

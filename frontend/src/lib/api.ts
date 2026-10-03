@@ -46,6 +46,12 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
       ...options,
     }),
+  patch: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
+    request<T>(endpoint, {
+      method: "PATCH",
+      body: body ? JSON.stringify(body) : undefined,
+      ...options,
+    }),
   put: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
     request<T>(endpoint, {
       method: "PUT",

@@ -234,13 +234,19 @@ export class AuthService {
     });
 
     const userId = payload.sub as string;
-    const tokenHash = await this.hashRefreshToken(refreshToken);
-    const token = await this.prisma.refreshToken.findFirst({
-      where: {
-        userId,
-        tokenHash,
-      },
+    const validTokens = await this.prisma.refreshToken.findMany({
+      where: { userId },
     });
+
+    const token = await (async () => {
+      for (const candidate of validTokens) {
+        const isMatch = await bcrypt.compare(refreshToken, candidate.tokenHash);
+        if (isMatch) {
+          return candidate;
+        }
+      }
+      return null;
+    })();
 
     if (!token) {
       throw new UnauthorizedException('Invalid refresh token');

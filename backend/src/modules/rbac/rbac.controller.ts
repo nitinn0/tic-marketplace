@@ -25,6 +25,7 @@ import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
 
 @UseGuards(JwtAuthGuard, PermissionGuard)
+
 @Controller('rbac')
 export class RbacController {
   constructor(private readonly rbacService: RbacService) {}

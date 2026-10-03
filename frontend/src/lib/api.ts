@@ -1,15 +1,25 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4011/api/v1";
+
+function getStoredAuthToken() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem("tic_access_token");
+}
 
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = getStoredAuthToken();
 
   const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
     ...options,

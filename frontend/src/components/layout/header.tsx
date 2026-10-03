@@ -26,14 +26,17 @@ export function Header() {
           <Link href={routes.dashboard} className="transition hover:text-sky-700">
             Dashboard
           </Link>
+          <Link href={routes.adminRbac} className="transition hover:text-sky-700">
+            RBAC
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="sm" type="button">
             For buyers
           </Button>
-          <Button size="sm" type="button">
-            For providers
+          <Button size="sm" type="button" asChild>
+            <Link href={routes.login}>Sign in</Link>
           </Button>
         </div>
       </div>

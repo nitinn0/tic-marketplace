@@ -24,7 +24,7 @@ export function getApiBaseUrl() {
   }
 
   if (isBrowserOnRemoteHost()) {
-    return "";
+    return "/api/v1";
   }
 
   return configuredApiUrl || "http://localhost:4011/api/v1";
@@ -65,8 +65,17 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}`);
+    const text = await response.text();
+    let message = text || `Request failed with status ${response.status}`;
+    try {
+      const parsed = JSON.parse(text) as { message?: string };
+      if (parsed.message) {
+        message = parsed.message;
+      }
+    } catch {
+      // Keep the raw response text when it is not JSON.
+    }
+    throw new Error(message);
   }
 
   if (response.status === 204) {

@@ -7,7 +7,226 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model HealthCheck {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  email           String        @unique
+  phone           String?
+  passwordHash    String?       @map("password_hash")
+  firstName       String        @map("first_name")
+  lastName        String        @map("last_name")
+  status          UserStatus    @default(ACTIVE)
+  emailVerifiedAt DateTime?     @map("email_verified_at")
+  phoneVerifiedAt DateTime?     @map("phone_verified_at")
+  lastLoginAt     DateTime?     @map("last_login_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  refreshTokens  RefreshToken[]
+  roles          UserRole[]
+  auditLogs      AuditLog[]     @relation("ActorAuditLogs")
+
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  replacedBy String?  @map("replaced_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model ModuleEntity {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  code        String      @unique
+  description String?
+  icon        String?
+  sortOrder   Int         @default(0) @map("sort_order")
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  subModules SubModule[]
+
+  @@index([isActive])
+  @@map("modules")
+}
+
+model SubModule {
+  id          String         @id @default(uuid()) @db.Uuid
+  moduleId    String         @map("module_id") @db.Uuid
+  name        String
+  code        String
+  description String?
+  sortOrder   Int            @default(0) @map("sort_order")
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  module         ModuleEntity     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  functionalities Functionality[]
+
+  @@unique([moduleId, code])
+  @@index([moduleId])
+  @@index([isActive])
+  @@map("sub_modules")
+}
+
+model Functionality {
+  id          String               @id @default(uuid()) @db.Uuid
+  subModuleId String              @map("sub_module_id") @db.Uuid
+  name        String
+  code        String
+  description String?
+  action      String
+  sortOrder   Int                 @default(0) @map("sort_order")
+  isActive    Boolean             @default(true) @map("is_active")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  subModule            SubModule  @relation(fields: [subModuleId], references: [id], onDelete: Cascade)
+  accessLevelPermissions AccessLevelPermission[]
+  rolePermissions      RolePermission[]
+
+  @@unique([subModuleId, code])
+  @@index([subModuleId])
+  @@index([isActive])
+  @@map("functionalities")
+}
+
+model AccessLevel {
+  id          String                 @id @default(uuid()) @db.Uuid
+  name        String
+  code        String                 @unique
+  description String?
+  sortOrder   Int                    @default(0) @map("sort_order")
+  isSystem    Boolean                @default(false) @map("is_system")
+  isActive    Boolean                @default(true) @map("is_active")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+
+  permissions       AccessLevelPermission[]
+  roleBaselines    Role[]                  @relation("RoleBaselineAccessLevel")
+  rolePermissions   RolePermission[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("access_levels")
+}
+
+model AccessLevelPermission {
+  id             String        @id @default(uuid()) @db.Uuid
+  accessLevelId  String        @map("access_level_id") @db.Uuid
+  functionalityId String       @map("functionality_id") @db.Uuid
+  canView        Boolean       @default(false) @map("can_view")
+  canCreate      Boolean       @default(false) @map("can_create")
+  canEdit        Boolean       @default(false) @map("can_edit")
+  canDelete      Boolean       @default(false) @map("can_delete")
+  canApprove     Boolean       @default(false) @map("can_approve")
+  canConfigure   Boolean       @default(false) @map("can_configure")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  accessLevel  AccessLevel  @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+  functionality Functionality @relation(fields: [functionalityId], references: [id], onDelete: Cascade)
+
+  @@unique([accessLevelId, functionalityId])
+  @@index([accessLevelId])
+  @@index([functionalityId])
+  @@map("access_level_permissions")
+}
+
+model Role {
+  id                   String   @id @default(uuid()) @db.Uuid
+  name                 String
+  code                 String   @unique
+  description          String?
+  category             String?
+  organizationType     String?  @map("organization_type")
+  baselineAccessLevelId String? @map("baseline_access_level_id") @db.Uuid
+  isSystem             Boolean  @default(false) @map("is_system")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  baselineAccessLevel AccessLevel? @relation("RoleBaselineAccessLevel", fields: [baselineAccessLevelId], references: [id], onDelete: SetNull)
+  permissions        RolePermission[]
+  userRoles          UserRole[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("roles")
+}
+
+model RolePermission {
+  id             String      @id @default(uuid()) @db.Uuid
+  roleId         String      @map("role_id") @db.Uuid
+  functionalityId String     @map("functionality_id") @db.Uuid
+  accessLevelId  String?     @map("access_level_id") @db.Uuid
+  canView        Boolean?    @map("can_view")
+  canCreate      Boolean?    @map("can_create")
+  canEdit        Boolean?    @map("can_edit")
+  canDelete      Boolean?    @map("can_delete")
+  canApprove     Boolean?    @map("can_approve")
+  canConfigure   Boolean?    @map("can_configure")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  role          Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  functionality Functionality @relation(fields: [functionalityId], references: [id], onDelete: Cascade)
+  accessLevel   AccessLevel?  @relation(fields: [accessLevelId], references: [id], onDelete: SetNull)
+
+  @@unique([roleId, functionalityId])
+  @@index([roleId])
+  @@index([functionalityId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  action      String
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType])
+  @@index([actorUserId])
+  @@map("audit_logs")
 }

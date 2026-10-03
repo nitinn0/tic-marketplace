@@ -5,6 +5,9 @@ import { appConfig } from './config/app.config.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { UsersModule } from './modules/users/users.module.js';
+import { RbacModule } from './modules/rbac/rbac.module.js';
 
 @Module({
   imports: [
@@ -14,6 +17,9 @@ import { AppService } from './app.service.js';
       load: [appConfig],
     }),
     DatabaseModule,
+    AuthModule,
+    UsersModule,
+    RbacModule,
   ],
   controllers: [AppController],
   providers: [AppService],

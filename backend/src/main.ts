@@ -11,11 +11,28 @@ async function bootstrap() {
 
   const port = configService.get<number>('app.port') ?? 3001;
   const frontendUrl = configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
+  const configuredCorsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const allowedOrigins = [
+    frontendUrl,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...configuredCorsOrigins,
+  ];
 
   app.setGlobalPrefix('api/v1');
   app.enableVersioning();
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000'],
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.includes(origin) || /^https:\/\/.*\.onrender\.com$/.test(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });

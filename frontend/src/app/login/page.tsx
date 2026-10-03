@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { signInWithEmail } from "@/lib/supabase-auth";
 import { routes } from "@/lib/constants";
 
 type LoginResponse = {
@@ -33,6 +34,26 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      const authData = await signInWithEmail(email, password).catch(() => null);
+
+      if (authData?.session) {
+        window.localStorage.setItem("tic_access_token", authData.session.access_token);
+        window.localStorage.setItem("tic_refresh_token", authData.session.refresh_token);
+        window.localStorage.setItem(
+          "tic_user",
+          JSON.stringify({
+            id: authData.user?.id ?? "supabase-user",
+            email: authData.user?.email ?? email,
+            firstName: "Supabase",
+            lastName: "User",
+            status: "ACTIVE",
+          }),
+        );
+        router.push(routes.dashboard);
+        router.refresh();
+        return;
+      }
+
       const result = await api.post<LoginResponse>("/auth/login", { email, password });
       window.localStorage.setItem("tic_access_token", result.accessToken);
       window.localStorage.setItem("tic_refresh_token", result.refreshToken);

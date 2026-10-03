@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Container } from "@/components/common/container";
+import { AccessLevelMatrix } from "@/components/rbac/access-level-matrix";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { getStoredSession } from "@/lib/auth";
@@ -670,50 +671,38 @@ export default function RbacAdminPage() {
 
   const renderAccessLevelBody = () => (
     <div className="space-y-6">
-      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3">
-        <input
-          value={accessLevelForm.name}
-          onChange={(e) => setAccessLevelForm((current) => ({ ...current, name: e.target.value }))}
-          placeholder="Access level name"
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-        />
-        <input
-          value={accessLevelForm.code}
-          onChange={(e) => setAccessLevelForm((current) => ({ ...current, code: e.target.value }))}
-          placeholder="VIEWER"
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-        />
-        <input
-          value={accessLevelForm.description}
-          onChange={(e) => setAccessLevelForm((current) => ({ ...current, description: e.target.value }))}
-          placeholder="Description"
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-        />
-      </div>
-      <Button type="button" onClick={() => void createAccessLevel()}>
-        Create access level
-      </Button>
+      <AccessLevelMatrix modules={modules} accessLevels={accessLevels} />
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-        Access level editing and deletion are not yet exposed in the backend contract, so this view is focused on creation and listing.
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {accessLevels.map((level) => (
-          <div key={level.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold text-slate-900">{level.name}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{level.code}</p>
-              </div>
-              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
-                {level.isSystem ? "System" : "Custom"}
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-slate-600">{level.description ?? "No description provided."}</p>
+      <details className="rounded-2xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+          Add a custom access level
+        </summary>
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3">
+            <input
+              value={accessLevelForm.name}
+              onChange={(e) => setAccessLevelForm((current) => ({ ...current, name: e.target.value }))}
+              placeholder="Access level name"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <input
+              value={accessLevelForm.code}
+              onChange={(e) => setAccessLevelForm((current) => ({ ...current, code: e.target.value }))}
+              placeholder="CUSTOM_LEVEL"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <input
+              value={accessLevelForm.description}
+              onChange={(e) => setAccessLevelForm((current) => ({ ...current, description: e.target.value }))}
+              placeholder="Description"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
           </div>
-        ))}
-      </div>
+          <Button type="button" onClick={() => void createAccessLevel()}>
+            Create access level
+          </Button>
+        </div>
+      </details>
     </div>
   );
 

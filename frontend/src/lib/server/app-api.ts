@@ -32,6 +32,19 @@ function camelize<T>(value: unknown): T {
   return value as T;
 }
 
+// Prisma generates ids and updated_at client-side, so the tables have no DB defaults for them.
+function newRow(values: JsonMap, { timestamps = true } = {}) {
+  return {
+    id: crypto.randomUUID(),
+    ...(timestamps ? { updated_at: new Date().toISOString() } : {}),
+    ...values,
+  };
+}
+
+function touched(values: JsonMap) {
+  return { ...values, updated_at: new Date().toISOString() };
+}
+
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
@@ -86,13 +99,15 @@ async function resolveAppUser(authUser: { id: string; email?: string }) {
   const metadata = (authUser as { user_metadata?: JsonMap }).user_metadata ?? {};
   const { data: created, error } = await admin
     .from("users")
-    .insert({
-      id: authUser.id,
-      email: email ?? `${authUser.id}@users.local`,
-      first_name: String(metadata.first_name ?? "Supabase"),
-      last_name: String(metadata.last_name ?? "User"),
-      status: "ACTIVE",
-    })
+    .insert(
+      newRow({
+        id: authUser.id,
+        email: email ?? `${authUser.id}@users.local`,
+        first_name: String(metadata.first_name ?? "Supabase"),
+        last_name: String(metadata.last_name ?? "User"),
+        status: "ACTIVE",
+      }),
+    )
     .select("*")
     .single();
 
@@ -302,11 +317,13 @@ export async function handleAppApi(request: Request, path: string) {
       const admin = getSupabaseAdmin();
       const { data, error } = await admin
         .from("modules")
-        .insert({
-          name: body.name,
-          code: body.code,
-          description: body.description || null,
-        })
+        .insert(
+          newRow({
+            name: body.name,
+            code: body.code,
+            description: body.description || null,
+          }),
+        )
         .select("*")
         .single();
       if (error) {
@@ -322,11 +339,13 @@ export async function handleAppApi(request: Request, path: string) {
         const body = await readJson(request);
         const { data, error } = await admin
           .from("modules")
-          .update({
-            name: body.name,
-            code: body.code,
-            description: body.description || null,
-          })
+          .update(
+            touched({
+              name: body.name,
+              code: body.code,
+              description: body.description || null,
+            }),
+          )
           .eq("id", moduleMatch[1])
           .select("*")
           .single();
@@ -353,17 +372,73 @@ export async function handleAppApi(request: Request, path: string) {
       const admin = getSupabaseAdmin();
       const { data, error } = await admin
         .from("access_levels")
-        .insert({
-          name: body.name,
-          code: body.code,
-          description: body.description || null,
-        })
+        .insert(
+          newRow({
+            name: body.name,
+            code: body.code,
+            description: body.description || null,
+          }),
+        )
         .select("*")
         .single();
       if (error) {
         throw new ApiError(error.message, 400);
       }
       return json(camelize(data), 201);
+    }
+
+    const accessMatrixMatch = path.match(/^rbac\/access-levels\/([^/]+)\/matrix$/);
+    if (accessMatrixMatch) {
+      const accessLevelId = accessMatrixMatch[1];
+      const admin = getSupabaseAdmin();
+      if (method === "GET") {
+        const { data, error } = await admin
+          .from("access_level_permissions")
+          .select("*")
+          .eq("access_level_id", accessLevelId);
+        if (error) {
+          throw new ApiError(error.message, 500);
+        }
+        return json(camelize(data ?? []));
+      }
+      if (method === "PUT") {
+        const body = await readJson(request);
+        const permissions = Array.isArray(body.permissions) ? body.permissions : null;
+        if (!permissions) {
+          throw new ApiError("Invalid permissions payload");
+        }
+
+        const { error: deleteError } = await admin
+          .from("access_level_permissions")
+          .delete()
+          .eq("access_level_id", accessLevelId);
+        if (deleteError) {
+          throw new ApiError(deleteError.message, 400);
+        }
+
+        if (permissions.length > 0) {
+          const { error: insertError } = await admin.from("access_level_permissions").insert(
+            permissions.map((permission) => {
+              const entry = permission as JsonMap;
+              return newRow({
+                access_level_id: accessLevelId,
+                functionality_id: entry.functionalityId,
+                can_view: Boolean(entry.canView),
+                can_create: Boolean(entry.canCreate),
+                can_edit: Boolean(entry.canEdit),
+                can_delete: Boolean(entry.canDelete),
+                can_approve: Boolean(entry.canApprove),
+                can_configure: Boolean(entry.canConfigure),
+              });
+            }),
+          );
+          if (insertError) {
+            throw new ApiError(insertError.message, 400);
+          }
+        }
+
+        return json({ success: true });
+      }
     }
 
     if (method === "GET" && path === "rbac/roles") {
@@ -375,13 +450,15 @@ export async function handleAppApi(request: Request, path: string) {
       const admin = getSupabaseAdmin();
       const { data, error } = await admin
         .from("roles")
-        .insert({
-          name: body.name,
-          code: body.code,
-          description: body.description || null,
-          category: body.category || null,
-          baseline_access_level_id: body.baselineAccessLevelId || null,
-        })
+        .insert(
+          newRow({
+            name: body.name,
+            code: body.code,
+            description: body.description || null,
+            category: body.category || null,
+            baseline_access_level_id: body.baselineAccessLevelId || null,
+          }),
+        )
         .select("*")
         .single();
       if (error) {
@@ -413,7 +490,7 @@ export async function handleAppApi(request: Request, path: string) {
           const { error: insertError } = await admin.from("role_permissions").insert(
             permissions.map((permission) => {
               const entry = permission as JsonMap;
-              return {
+              return newRow({
                 role_id: roleId,
                 functionality_id: entry.functionalityId,
                 access_level_id: entry.accessLevelId || null,
@@ -423,7 +500,7 @@ export async function handleAppApi(request: Request, path: string) {
                 can_delete: entry.canDelete ?? null,
                 can_approve: entry.canApprove ?? null,
                 can_configure: entry.canConfigure ?? null,
-              };
+              });
             }),
           );
           if (insertError) {
@@ -449,13 +526,15 @@ export async function handleAppApi(request: Request, path: string) {
         const body = await readJson(request);
         const { data, error } = await admin
           .from("roles")
-          .update({
-            name: body.name,
-            code: body.code,
-            description: body.description || null,
-            category: body.category || null,
-            baseline_access_level_id: body.baselineAccessLevelId || null,
-          })
+          .update(
+            touched({
+              name: body.name,
+              code: body.code,
+              description: body.description || null,
+              category: body.category || null,
+              baseline_access_level_id: body.baselineAccessLevelId || null,
+            }),
+          )
           .eq("id", roleMatch[1])
           .select("*")
           .single();
@@ -491,7 +570,7 @@ export async function handleAppApi(request: Request, path: string) {
       const admin = getSupabaseAdmin();
       const { data, error } = await admin
         .from("user_roles")
-        .insert({ user_id: userId, role_id: body.roleId })
+        .insert(newRow({ user_id: userId, role_id: body.roleId }, { timestamps: false }))
         .select("*")
         .single();
       if (error) {

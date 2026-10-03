@@ -249,6 +249,7 @@ async function main() {
   const viewerLevel = await upsertAccessLevel('VIEWER', 'Viewer', 1);
   const editorLevel = await upsertAccessLevel('EDITOR', 'Editor', 2);
   const adminLevel = await upsertAccessLevel('ADMIN', 'Administrator', 3);
+  await upsertAccessLevel('CREATOR', 'Creator', 4);
 
   const platformModule = await upsertModule('platform', 'Platform', 1);
   const rbacModule = await upsertModule('rbac', 'RBAC', 2);

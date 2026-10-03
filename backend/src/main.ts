@@ -26,7 +26,12 @@ async function bootstrap() {
   app.enableVersioning();
   app.enableCors({
     origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-      if (!origin || allowedOrigins.includes(origin) || /^https:\/\/.*\.onrender\.com$/.test(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/.*\.onrender\.com$/.test(origin) ||
+        /^https:\/\/.*\.vercel\.app$/.test(origin)
+      ) {
         callback(null, true);
         return;
       }

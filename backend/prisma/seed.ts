@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -169,6 +170,29 @@ async function assignRoleToUser(userEmail: string, roleCode: string) {
   });
 }
 
+async function upsertUser(email: string, firstName: string, lastName: string, password: string) {
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  return prisma.user.upsert({
+    where: { email },
+    update: {
+      firstName,
+      lastName,
+      passwordHash,
+      status: 'ACTIVE',
+      emailVerifiedAt: new Date(),
+    },
+    create: {
+      email,
+      firstName,
+      lastName,
+      passwordHash,
+      status: 'ACTIVE',
+      emailVerifiedAt: new Date(),
+    },
+  });
+}
+
 async function main() {
   const viewerLevel = await upsertAccessLevel('VIEWER', 'Viewer', 1);
   const editorLevel = await upsertAccessLevel('EDITOR', 'Editor', 2);
@@ -223,6 +247,11 @@ async function main() {
   const adminRole = await upsertRole('ADMIN', 'Administrator', adminLevel.id, 'system');
   const userRole = await upsertRole('USER', 'User', viewerLevel.id, 'platform');
 
+  const superAdminUser = await upsertUser('bob+auth@example.com', 'Bob', 'Auth', 'password123');
+
+  await assignRoleToUser(superAdminUser.email, 'SUPER_ADMIN');
+  await assignRoleToUser('alice+test@example.com', 'USER');
+
   await upsertRolePermission(superAdminRole.id, platformOverview.id, adminLevel.id, {
     canView: true,
     canCreate: true,
@@ -270,9 +299,6 @@ async function main() {
     canDelete: false,
     canConfigure: false,
   });
-
-  await assignRoleToUser('bob+auth@example.com', 'SUPER_ADMIN');
-  await assignRoleToUser('alice+test@example.com', 'USER');
 
   console.log('RBAC seed completed successfully');
 }

@@ -41,8 +41,8 @@ export function Footer() {
             Contact
           </h3>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>hello@ticmarketplace.com</li>
-            <li>+1 (555) 123-4567</li>
+            <li>info@ticmarketplace.com</li>
+            <li>+91 9990992492</li>
             <li>Remote-first</li>
           </ul>
         </div>

@@ -30,6 +30,11 @@ export function getApiBaseUrl() {
   return configuredApiUrl || "http://localhost:4011/api/v1";
 }
 
+// The in-app Next.js API route validates Supabase tokens; the Nest backend only accepts its own JWTs.
+export function usesSupabaseAuth() {
+  return getApiBaseUrl().startsWith("/");
+}
+
 export function isRemoteApiConfigured() {
   const url = getApiBaseUrl();
   return Boolean(url) && !isLoopbackApiUrl(url);

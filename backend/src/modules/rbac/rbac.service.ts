@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../../database/prisma.service.js';
 
@@ -107,10 +108,25 @@ export class RbacService {
   }
 
   async getRoles() {
-    return this.prisma.role.findMany({
+    const roles = await this.prisma.role.findMany({
       orderBy: { name: 'asc' },
-      include: { baselineAccessLevel: true },
+      include: {
+        baselineAccessLevel: true,
+        userRoles: {
+          orderBy: { assignedAt: 'asc' },
+          include: {
+            user: {
+              select: { id: true, email: true, firstName: true, lastName: true, status: true },
+            },
+          },
+        },
+      },
     });
+
+    return roles.map(({ userRoles, ...role }) => ({
+      ...role,
+      users: userRoles.map(({ user, assignedAt }) => ({ ...user, assignedAt })),
+    }));
   }
 
   async getRole(id: string) {
@@ -274,6 +290,77 @@ export class RbacService {
     });
 
     return { success: true };
+  }
+
+  async createUserWithRole(dto: { email: string; password: string; roleId: string }) {
+    const email = dto.email.toLowerCase();
+
+    const role = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      throw new BadRequestException('User with this email already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          firstName: email.split('@')[0],
+          lastName: '',
+          status: 'ACTIVE',
+        },
+      });
+      await tx.userRole.create({ data: { userId: created.id, roleId: role.id } });
+      return created;
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      status: user.status,
+      role: { id: role.id, name: role.name, code: role.code },
+    };
+  }
+
+  async listUsers() {
+    return this.prisma.user.findMany({
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { email: 'asc' }],
+      select: { id: true, email: true, firstName: true, lastName: true, status: true },
+    });
+  }
+
+  async setRoleUsers(roleId: string, userIds: string[]) {
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+
+    const desired = new Set(userIds);
+    const current = await this.prisma.userRole.findMany({ where: { roleId }, select: { userId: true } });
+    const currentIds = new Set(current.map((entry) => entry.userId));
+    const toRemove = [...currentIds].filter((id) => !desired.has(id));
+    const toAdd = [...desired].filter((id) => !currentIds.has(id));
+
+    if (role.isSystem && toRemove.length > 0) {
+      throw new BadRequestException('Protected system roles cannot be removed from users');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.userRole.deleteMany({ where: { roleId, userId: { in: toRemove } } }),
+      this.prisma.userRole.createMany({
+        data: toAdd.map((userId) => ({ userId, roleId })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    return { success: true, added: toAdd.length, removed: toRemove.length };
   }
 
   async getUserRoles(userId: string) {

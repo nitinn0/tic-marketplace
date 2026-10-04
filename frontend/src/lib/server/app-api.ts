@@ -241,7 +241,10 @@ async function listAccessLevels() {
 async function listRoles() {
   const admin = getSupabaseAdmin();
   const [{ data: roles, error: rolesError }, { data: levels, error: levelsError }] = await Promise.all([
-    admin.from("roles").select("*").order("name"),
+    admin
+      .from("roles")
+      .select("*, user_roles(assigned_at, user:users(id, email, first_name, last_name, status))")
+      .order("name"),
     admin.from("access_levels").select("id, name, code"),
   ]);
 
@@ -254,12 +257,17 @@ async function listRoles() {
 
   const levelMap = new Map((levels ?? []).map((level) => [level.id, camelize(level)]));
   return (roles ?? []).map((role) => {
-    const mapped = camelize<JsonMap>(role);
+    const { userRoles, ...mapped } = camelize<JsonMap & {
+      userRoles?: Array<{ assignedAt: string; user: JsonMap | null }>;
+    }>(role);
     return {
       ...mapped,
       baselineAccessLevel: mapped.baselineAccessLevelId
         ? levelMap.get(String(mapped.baselineAccessLevelId)) ?? null
         : null,
+      users: (userRoles ?? [])
+        .filter((entry) => entry.user)
+        .map((entry) => ({ ...entry.user, assignedAt: entry.assignedAt })),
     };
   });
 }
@@ -456,7 +464,9 @@ export async function handleAppApi(request: Request, path: string) {
             code: body.code,
             description: body.description || null,
             category: body.category || null,
+            organization_type: body.organizationType || null,
             baseline_access_level_id: body.baselineAccessLevelId || null,
+            is_active: typeof body.isActive === "boolean" ? body.isActive : true,
           }),
         )
         .select("*")
@@ -465,6 +475,64 @@ export async function handleAppApi(request: Request, path: string) {
         throw new ApiError(error.message, 400);
       }
       return json(camelize(data), 201);
+    }
+
+    const roleUsersMatch = path.match(/^rbac\/roles\/([^/]+)\/users$/);
+    if (roleUsersMatch && method === "PUT") {
+      const roleId = roleUsersMatch[1];
+      const body = await readJson(request);
+      if (!Array.isArray(body.userIds)) {
+        throw new ApiError("Invalid user assignment payload");
+      }
+      const desired = new Set(body.userIds.map(String));
+
+      const admin = getSupabaseAdmin();
+      const { data: role, error: roleError } = await admin
+        .from("roles")
+        .select("id, is_system")
+        .eq("id", roleId)
+        .maybeSingle();
+      if (roleError || !role) {
+        throw new ApiError("Role not found", 404);
+      }
+
+      const { data: current, error: currentError } = await admin
+        .from("user_roles")
+        .select("user_id")
+        .eq("role_id", roleId);
+      if (currentError) {
+        throw new ApiError(currentError.message, 500);
+      }
+
+      const currentIds = new Set((current ?? []).map((entry) => String(entry.user_id)));
+      const toRemove = [...currentIds].filter((id) => !desired.has(id));
+      const toAdd = [...desired].filter((id) => !currentIds.has(id));
+
+      if (role.is_system && toRemove.length > 0) {
+        throw new ApiError("Protected system roles cannot be removed from users");
+      }
+
+      if (toRemove.length > 0) {
+        const { error } = await admin
+          .from("user_roles")
+          .delete()
+          .eq("role_id", roleId)
+          .in("user_id", toRemove);
+        if (error) {
+          throw new ApiError(error.message, 400);
+        }
+      }
+
+      if (toAdd.length > 0) {
+        const { error } = await admin
+          .from("user_roles")
+          .insert(toAdd.map((userId) => newRow({ user_id: userId, role_id: roleId }, { timestamps: false })));
+        if (error) {
+          throw new ApiError(error.message, 400);
+        }
+      }
+
+      return json({ success: true, added: toAdd.length, removed: toRemove.length });
     }
 
     const rolePermissionsMatch = path.match(/^rbac\/roles\/([^/]+)\/permissions$/);
@@ -532,7 +600,9 @@ export async function handleAppApi(request: Request, path: string) {
               code: body.code,
               description: body.description || null,
               category: body.category || null,
+              organization_type: body.organizationType || null,
               baseline_access_level_id: body.baselineAccessLevelId || null,
+              ...(typeof body.isActive === "boolean" ? { is_active: body.isActive } : {}),
             }),
           )
           .eq("id", roleMatch[1])
@@ -561,6 +631,84 @@ export async function handleAppApi(request: Request, path: string) {
         }
         return json({ success: true });
       }
+    }
+
+    if (method === "GET" && path === "rbac/users") {
+      const admin = getSupabaseAdmin();
+      const { data, error } = await admin
+        .from("users")
+        .select("id, email, first_name, last_name, status")
+        .order("first_name")
+        .order("last_name")
+        .order("email");
+      if (error) {
+        throw new ApiError(error.message, 500);
+      }
+      return json(camelize(data ?? []));
+    }
+
+    if (method === "POST" && path === "rbac/users") {
+      const body = await readJson(request);
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const password = String(body.password ?? "");
+      const roleId = String(body.roleId ?? "");
+
+      if (!email || !roleId) {
+        throw new ApiError("Email and role are required");
+      }
+      if (password.length < 8) {
+        throw new ApiError("Password must be at least 8 characters");
+      }
+
+      const admin = getSupabaseAdmin();
+      const { data: role, error: roleError } = await admin
+        .from("roles")
+        .select("id, name, code")
+        .eq("id", roleId)
+        .maybeSingle();
+      if (roleError || !role) {
+        throw new ApiError("Role not found", 404);
+      }
+
+      const { data: existing } = await admin.from("users").select("id").eq("email", email).maybeSingle();
+      if (existing) {
+        throw new ApiError("User with this email already exists");
+      }
+
+      const { data: authData, error: authError } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (authError || !authData.user) {
+        throw new ApiError(authError?.message ?? "Unable to create auth user", 400);
+      }
+
+      const authUserId = authData.user.id;
+      const { error: userError } = await admin.from("users").insert(
+        newRow({
+          id: authUserId,
+          email,
+          first_name: email.split("@")[0],
+          last_name: "",
+          status: "ACTIVE",
+        }),
+      );
+      if (userError) {
+        await admin.auth.admin.deleteUser(authUserId);
+        throw new ApiError(userError.message, 400);
+      }
+
+      const { error: assignError } = await admin
+        .from("user_roles")
+        .insert(newRow({ user_id: authUserId, role_id: role.id }, { timestamps: false }));
+      if (assignError) {
+        await admin.from("users").delete().eq("id", authUserId);
+        await admin.auth.admin.deleteUser(authUserId);
+        throw new ApiError(assignError.message, 400);
+      }
+
+      return json({ id: authUserId, email, status: "ACTIVE", role }, 201);
     }
 
     const userRoleMatch = path.match(/^rbac\/users\/([^/]+)\/roles$/);

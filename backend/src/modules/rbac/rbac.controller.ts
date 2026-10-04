@@ -23,6 +23,8 @@ import { CreateFunctionalityDto } from './dto/create-functionality.dto.js';
 import { CreateAccessLevelDto } from './dto/create-access-level.dto.js';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
+import { CreateUserWithRoleDto } from './dto/create-user-with-role.dto.js';
+import { SetRoleUsersDto } from './dto/set-role-users.dto.js';
 
 @UseGuards(JwtAuthGuard, PermissionGuard)
 
@@ -142,6 +144,24 @@ export class RbacController {
   @RequirePermission('rbac.manage_access_levels', 'configure')
   async putAccessMatrix(@Param('id') id: string, @Body() body: unknown) {
     return this.rbacService.setAccessLevelMatrix(id, body);
+  }
+
+  @Put('roles/:id/users')
+  @RequirePermission('rbac.manage_roles', 'edit')
+  async putRoleUsers(@Param('id') id: string, @Body() body: SetRoleUsersDto) {
+    return this.rbacService.setRoleUsers(id, body.userIds);
+  }
+
+  @Get('users')
+  @RequirePermission('rbac.manage_roles', 'view')
+  async listUsers() {
+    return this.rbacService.listUsers();
+  }
+
+  @Post('users')
+  @RequirePermission('rbac.manage_roles', 'create')
+  async createUserWithRole(@Body() dto: CreateUserWithRoleDto) {
+    return this.rbacService.createUserWithRole(dto);
   }
 
   @Get('users/:userId/roles')

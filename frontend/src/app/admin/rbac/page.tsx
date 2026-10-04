@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Container } from "@/components/common/container";
 import { AccessLevelMatrix } from "@/components/rbac/access-level-matrix";
+import { RolesManager, type RbacRole } from "@/components/rbac/roles-manager";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { getStoredSession } from "@/lib/auth";
 
 const tabs = [
   { key: "modules", label: "Modules & Functionality" },
@@ -44,90 +44,18 @@ type AccessLevel = {
   isActive: boolean;
 };
 
-type Role = {
-  id: string;
-  code: string;
-  name: string;
-  description?: string | null;
-  category?: string | null;
-  baselineAccessLevel?: { id: string; name: string; code: string } | null;
-  isSystem: boolean;
-  isActive: boolean;
-};
-
-type RolePermissionEntry = {
-  id?: string;
-  functionalityId: string;
-  accessLevelId?: string | null;
-  canView?: boolean | null;
-  canCreate?: boolean | null;
-  canEdit?: boolean | null;
-  canDelete?: boolean | null;
-  canApprove?: boolean | null;
-  canConfigure?: boolean | null;
-  functionality?: {
-    id: string;
-    code: string;
-    name: string;
-    action: string;
-    subModule?: {
-      id: string;
-      name: string;
-      module?: {
-        id: string;
-        name: string;
-      };
-    };
-  };
-  accessLevel?: { id: string; name: string; code: string } | null;
-};
-
-type PermissionDraft = {
-  functionalityId: string;
-  functionalityCode: string;
-  functionalityName: string;
-  action: string;
-  moduleName: string;
-  subModuleName: string;
-  accessLevelId: string | null;
-  canView: boolean;
-  canCreate: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canApprove: boolean;
-  canConfigure: boolean;
-};
-
 export default function RbacAdminPage() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["key"]>("modules");
   const [modules, setModules] = useState<ModuleEntity[]>([]);
   const [accessLevels, setAccessLevels] = useState<AccessLevel[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState<RbacRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState("");
-  const [assignMessage, setAssignMessage] = useState<string | null>(null);
 
   const [moduleForm, setModuleForm] = useState({ name: "", code: "", description: "" });
   const [accessLevelForm, setAccessLevelForm] = useState({ name: "", code: "", description: "" });
-  const [roleForm, setRoleForm] = useState({
-    name: "",
-    code: "",
-    description: "",
-    category: "system",
-    baselineAccessLevelId: "",
-  });
   const [moduleDraft, setModuleDraft] = useState({ name: "", code: "", description: "" });
-  const [roleDraft, setRoleDraft] = useState({
-    name: "",
-    code: "",
-    description: "",
-    category: "system",
-    baselineAccessLevelId: "",
-  });
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
-  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -137,15 +65,12 @@ export default function RbacAdminPage() {
       const [modulesData, levelsData, rolesData] = await Promise.all([
         api.get<ModuleEntity[]>("/rbac/modules"),
         api.get<AccessLevel[]>("/rbac/access-levels"),
-        api.get<Role[]>("/rbac/roles"),
+        api.get<RbacRole[]>("/rbac/roles"),
       ]);
 
       setModules(modulesData);
       setAccessLevels(levelsData);
       setRoles(rolesData);
-      if (!selectedRoleId && rolesData[0]) {
-        setSelectedRoleId(rolesData[0].id);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load RBAC data.");
     } finally {
@@ -153,11 +78,11 @@ export default function RbacAdminPage() {
     }
   };
 
+  const reloadRoles = async () => {
+    setRoles(await api.get<RbacRole[]>("/rbac/roles"));
+  };
+
   useEffect(() => {
-    const session = getStoredSession();
-    if (session) {
-      setUserId(session.user.id);
-    }
     void loadData();
   }, []);
 
@@ -197,44 +122,6 @@ export default function RbacAdminPage() {
     }
   };
 
-  const createRole = async () => {
-    try {
-      setError(null);
-      await api.post("/rbac/roles", {
-        name: roleForm.name,
-        code: roleForm.code,
-        description: roleForm.description || undefined,
-        category: roleForm.category || undefined,
-        baselineAccessLevelId: roleForm.baselineAccessLevelId || undefined,
-      });
-      setRoleForm({
-        name: "",
-        code: "",
-        description: "",
-        category: "system",
-        baselineAccessLevelId: "",
-      });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create role.");
-    }
-  };
-
-  const assignRoleToUser = async () => {
-    if (!userId || !selectedRoleId) {
-      setAssignMessage("Select a user and a role");
-      return;
-    }
-
-    try {
-      setAssignMessage(null);
-      await api.post(`/rbac/users/${userId}/roles`, { roleId: selectedRoleId });
-      setAssignMessage("Role assigned successfully.");
-    } catch (err) {
-      setAssignMessage(err instanceof Error ? err.message : "Unable to assign role.");
-    }
-  };
-
   const beginEditModule = (module: ModuleEntity) => {
     setEditingModuleId(module.id);
     setModuleDraft({
@@ -267,63 +154,6 @@ export default function RbacAdminPage() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete module.");
-    }
-  };
-
-  const beginEditRole = (role: Role) => {
-    setEditingRoleId(role.id);
-    setRoleDraft({
-      name: role.name,
-      code: role.code,
-      description: role.description ?? "",
-      category: role.category ?? "system",
-      baselineAccessLevelId: role.baselineAccessLevel?.id ?? "",
-    });
-  };
-
-  const saveRole = async (roleId: string) => {
-    try {
-      setError(null);
-      await api.patch(`/rbac/roles/${roleId}`, {
-        name: roleDraft.name,
-        code: roleDraft.code,
-        description: roleDraft.description || undefined,
-        category: roleDraft.category || undefined,
-        baselineAccessLevelId: roleDraft.baselineAccessLevelId || undefined,
-      });
-      setEditingRoleId(null);
-      setRoleDraft({ name: "", code: "", description: "", category: "system", baselineAccessLevelId: "" });
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update role.");
-    }
-  };
-
-  const deleteRole = async (roleId: string) => {
-    try {
-      setError(null);
-      await api.delete(`/rbac/roles/${roleId}`);
-      if (selectedRoleId === roleId) {
-        setSelectedRoleId("");
-      }
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete role.");
-    }
-  };
-
-  const removeUserRole = async (roleId: string) => {
-    if (!userId) {
-      setAssignMessage("User ID is required to remove a role.");
-      return;
-    }
-
-    try {
-      setAssignMessage(null);
-      await api.delete(`/rbac/users/${userId}/roles/${roleId}`);
-      setAssignMessage("Role removed successfully.");
-    } catch (err) {
-      setAssignMessage(err instanceof Error ? err.message : "Unable to remove role.");
     }
   };
 
@@ -365,75 +195,6 @@ export default function RbacAdminPage() {
             Save
           </Button>
           <Button type="button" variant="secondary" onClick={() => setEditingModuleId(null)}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderRoleActions = (role: Role) => {
-    if (editingRoleId !== role.id) {
-      return (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={() => beginEditRole(role)}>
-            Edit
-          </Button>
-          {!role.isSystem ? (
-            <Button type="button" variant="destructive" onClick={() => void deleteRole(role.id)}>
-              Delete
-            </Button>
-          ) : null}
-          {userId ? (
-            <Button type="button" variant="secondary" onClick={() => void removeUserRole(role.id)}>
-              Remove from user
-            </Button>
-          ) : null}
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            value={roleDraft.name}
-            onChange={(e) => setRoleDraft((current) => ({ ...current, name: e.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <input
-            value={roleDraft.code}
-            onChange={(e) => setRoleDraft((current) => ({ ...current, code: e.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <input
-            value={roleDraft.category}
-            onChange={(e) => setRoleDraft((current) => ({ ...current, category: e.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <select
-            value={roleDraft.baselineAccessLevelId}
-            onChange={(e) => setRoleDraft((current) => ({ ...current, baselineAccessLevelId: e.target.value }))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          >
-            <option value="">Choose access level</option>
-            {accessLevels.map((level) => (
-              <option key={level.id} value={level.id}>
-                {level.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <input
-          value={roleDraft.description}
-          onChange={(e) => setRoleDraft((current) => ({ ...current, description: e.target.value }))}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        />
-        <div className="flex gap-2">
-          <Button type="button" onClick={() => void saveRole(role.id)}>
-            Save
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setEditingRoleId(null)}>
             Cancel
           </Button>
         </div>
@@ -510,165 +271,6 @@ export default function RbacAdminPage() {
     </div>
   );
 
-  const renderRoleBody = () => (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            value={roleForm.name}
-            onChange={(e) => setRoleForm((current) => ({ ...current, name: e.target.value }))}
-            placeholder="Role name"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-          <input
-            value={roleForm.code}
-            onChange={(e) => setRoleForm((current) => ({ ...current, code: e.target.value }))}
-            placeholder="SUPER_ADMIN"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-          <input
-            value={roleForm.category}
-            onChange={(e) => setRoleForm((current) => ({ ...current, category: e.target.value }))}
-            placeholder="system"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-          <select
-            value={roleForm.baselineAccessLevelId}
-            onChange={(e) => setRoleForm((current) => ({ ...current, baselineAccessLevelId: e.target.value }))}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">Choose access level</option>
-            {accessLevels.map((level) => (
-              <option key={level.id} value={level.id}>
-                {level.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-4">
-          <input
-            value={roleForm.description}
-            onChange={(e) => setRoleForm((current) => ({ ...current, description: e.target.value }))}
-            placeholder="Role description"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-        </div>
-        <div className="mt-4">
-          <Button type="button" onClick={() => void createRole()}>
-            Create role
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Role permission matrix
-          </p>
-          <select
-            value={selectedRoleForMatrix}
-            onChange={(e) => setSelectedRoleForMatrix(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="">Choose role</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedRoleForMatrix && permissionDrafts.length > 0 ? (
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Module</th>
-                    <th className="px-4 py-3 font-medium">Functionality</th>
-                    <th className="px-4 py-3 font-medium">Action</th>
-                    <th className="px-4 py-3 font-medium">View</th>
-                    <th className="px-4 py-3 font-medium">Create</th>
-                    <th className="px-4 py-3 font-medium">Edit</th>
-                    <th className="px-4 py-3 font-medium">Delete</th>
-                    <th className="px-4 py-3 font-medium">Approve</th>
-                    <th className="px-4 py-3 font-medium">Configure</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {permissionDrafts.map((row) => (
-                    <tr key={row.functionalityId}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-slate-800">{row.moduleName}</div>
-                        <div className="text-xs text-slate-500">{row.subModuleName}</div>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800">{row.functionalityName}</td>
-                      <td className="px-4 py-3 text-slate-600">{row.action}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canView}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canView", e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canCreate}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canCreate", e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canEdit}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canEdit", e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canDelete}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canDelete", e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canApprove}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canApprove", e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={row.canConfigure}
-                          onChange={(e) => syncPermissionToggle(row.functionalityId, "canConfigure", e.target.checked)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" onClick={() => void saveRolePermissions()}>
-                Save permissions
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-            Select a role to view and edit its permission matrix.
-          </div>
-        )}
-
-        {matrixMessage ? <p className="mt-3 text-sm text-slate-700">{matrixMessage}</p> : null}
-      </div>
-    </div>
-  );
-
   const renderAccessLevelBody = () => (
     <div className="space-y-6">
       <AccessLevelMatrix modules={modules} accessLevels={accessLevels} />
@@ -705,100 +307,6 @@ export default function RbacAdminPage() {
       </details>
     </div>
   );
-
-  const [selectedRolePermissions, setSelectedRolePermissions] = useState<RolePermissionEntry[]>([]);
-  const [selectedRoleForMatrix, setSelectedRoleForMatrix] = useState<string>("");
-  const [permissionDrafts, setPermissionDrafts] = useState<PermissionDraft[]>([]);
-  const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedRoleForMatrix && roles[0]) {
-      setSelectedRoleForMatrix(roles[0].id);
-    }
-  }, [roles, selectedRoleForMatrix]);
-
-  useEffect(() => {
-    if (!selectedRoleForMatrix) {
-      setSelectedRolePermissions([]);
-      setPermissionDrafts([]);
-      return;
-    }
-    void loadRolePermissions(selectedRoleForMatrix);
-  }, [selectedRoleForMatrix]);
-
-  const loadRolePermissions = async (roleId: string) => {
-    if (!roleId) {
-      setSelectedRolePermissions([]);
-      setPermissionDrafts([]);
-      return;
-    }
-
-    try {
-      const payload = await api.get<RolePermissionEntry[]>(`/rbac/roles/${roleId}/permissions`);
-      setSelectedRolePermissions(payload);
-
-      const flattened = payload.map((entry) => ({
-        functionalityId: entry.functionalityId,
-        functionalityCode: entry.functionality?.code ?? "",
-        functionalityName: entry.functionality?.name ?? "",
-        action: entry.functionality?.action ?? "",
-        moduleName: entry.functionality?.subModule?.module?.name ?? "",
-        subModuleName: entry.functionality?.subModule?.name ?? "",
-        accessLevelId: entry.accessLevelId ?? null,
-        canView: Boolean(entry.canView),
-        canCreate: Boolean(entry.canCreate),
-        canEdit: Boolean(entry.canEdit),
-        canDelete: Boolean(entry.canDelete),
-        canApprove: Boolean(entry.canApprove),
-        canConfigure: Boolean(entry.canConfigure),
-      }));
-
-      setPermissionDrafts(flattened);
-    } catch (err) {
-      setMatrixMessage(err instanceof Error ? err.message : "Unable to load role permissions.");
-    }
-  };
-
-  const syncPermissionToggle = (
-    functionalityId: string,
-    flag: "canView" | "canCreate" | "canEdit" | "canDelete" | "canApprove" | "canConfigure",
-    value: boolean,
-  ) => {
-    setPermissionDrafts((current) =>
-      current.map((item) =>
-        item.functionalityId === functionalityId
-          ? { ...item, [flag]: value }
-          : item,
-      ),
-    );
-  };
-
-  const saveRolePermissions = async () => {
-    if (!selectedRoleForMatrix) {
-      setMatrixMessage("Select a role before saving permissions.");
-      return;
-    }
-
-    try {
-      setMatrixMessage(null);
-      await api.put(`/rbac/roles/${selectedRoleForMatrix}/permissions`, {
-        permissions: permissionDrafts.map((item) => ({
-          functionalityId: item.functionalityId,
-          accessLevelId: item.accessLevelId ?? undefined,
-          canView: item.canView,
-          canCreate: item.canCreate,
-          canEdit: item.canEdit,
-          canDelete: item.canDelete,
-          canApprove: item.canApprove,
-          canConfigure: item.canConfigure,
-        })),
-      });
-      setMatrixMessage("Role permissions saved successfully.");
-      await loadRolePermissions(selectedRoleForMatrix);
-    } catch (err) {
-      setMatrixMessage(err instanceof Error ? err.message : "Unable to save role permissions.");
-    }
-  };
 
   return (
     <Container className="py-10">
@@ -839,6 +347,10 @@ export default function RbacAdminPage() {
         <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
           {error}
         </div>
+      ) : activeTab === "roles" ? (
+        <div className="mt-8">
+          <RolesManager roles={roles} accessLevels={accessLevels} onRolesChanged={reloadRoles} />
+        </div>
       ) : (
         <div className="mt-8 space-y-8">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -854,8 +366,6 @@ export default function RbacAdminPage() {
             {activeTab === "modules" ? renderModuleBody() : null}
 
             {activeTab === "accessLevels" ? renderAccessLevelBody() : null}
-
-            {activeTab === "roles" ? renderRoleBody() : null}
           </div>
         </div>
       )}

@@ -40,12 +40,45 @@ export function isRemoteApiConfigured() {
   return Boolean(url) && !isLoopbackApiUrl(url);
 }
 
+const ACTIVE_ORGANIZATION_KEY = "tic_active_organization_id";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 function getStoredAuthToken() {
   if (typeof window === "undefined") {
     return null;
   }
 
   return window.localStorage.getItem("tic_access_token");
+}
+
+export function getActiveOrganizationId() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(ACTIVE_ORGANIZATION_KEY);
+}
+
+/** The backend re-validates this id against the user's membership on every request. */
+export function setActiveOrganizationId(organizationId: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (organizationId) {
+    window.localStorage.setItem(ACTIVE_ORGANIZATION_KEY, organizationId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
+  }
 }
 
 async function request<T>(
@@ -59,28 +92,36 @@ async function request<T>(
 
   const url = `${apiBaseUrl}${endpoint}`;
   const token = getStoredAuthToken();
+  const { headers: customHeaders, ...init } = options;
 
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-    ...options,
-  });
+  const headers = new Headers(customHeaders);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const activeOrganizationId = getActiveOrganizationId();
+  if (activeOrganizationId && !usesSupabaseAuth() && !headers.has("X-Organization-Id")) {
+    headers.set("X-Organization-Id", activeOrganizationId);
+  }
+
+  const response = await fetch(url, { ...init, headers });
 
   if (!response.ok) {
     const text = await response.text();
     let message = text || `Request failed with status ${response.status}`;
     try {
-      const parsed = JSON.parse(text) as { message?: string };
-      if (parsed.message) {
+      const parsed = JSON.parse(text) as { message?: string | string[] };
+      if (Array.isArray(parsed.message)) {
+        message = parsed.message.join(", ");
+      } else if (parsed.message) {
         message = parsed.message;
       }
     } catch {
       // Keep the raw response text when it is not JSON.
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   if (response.status === 204) {

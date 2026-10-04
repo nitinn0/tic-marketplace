@@ -9,6 +9,10 @@ export const routes = {
   login: "/login",
   dashboard: "/dashboard",
   adminRbac: "/admin/rbac",
+  organizations: "/organizations",
+  organization: (id: string) => `/organizations/${id}`,
+  organizationMembers: (id: string) => `/organizations/${id}/members`,
+  acceptInvitation: "/invitations/accept",
 } as const;
 
 export type UserRole = "buyer" | "provider" | "admin";

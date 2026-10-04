@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { getStoredSession, clearSession } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { ActiveOrganizationCard } from "@/features/organizations/components/active-organization-card";
 
 function StatCard({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "success" | "warning" }) {
   const tones = {
@@ -115,6 +116,10 @@ export default function DashboardPage() {
             <StatCard title="User" value={`${me.user.firstName} ${me.user.lastName}`} />
             <StatCard title="Roles" value={String(me.roles.length)} tone="success" />
             <StatCard title="Permissions" value={String(totalPermissions)} tone="warning" />
+          </div>
+
+          <div className="mt-8">
+            <ActiveOrganizationCard />
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">

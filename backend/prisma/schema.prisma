@@ -14,22 +14,26 @@ enum UserStatus {
 }
 
 model User {
-  id              String        @id @default(uuid()) @db.Uuid
-  email           String        @unique
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
   phone           String?
-  passwordHash    String?       @map("password_hash")
-  firstName       String        @map("first_name")
-  lastName        String        @map("last_name")
-  status          UserStatus    @default(ACTIVE)
-  emailVerifiedAt DateTime?     @map("email_verified_at")
-  phoneVerifiedAt DateTime?     @map("phone_verified_at")
-  lastLoginAt     DateTime?     @map("last_login_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  passwordHash    String?    @map("password_hash")
+  firstName       String     @map("first_name")
+  lastName        String     @map("last_name")
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  refreshTokens  RefreshToken[]
-  roles          UserRole[]
-  auditLogs      AuditLog[]     @relation("ActorAuditLogs")
+  refreshTokens           RefreshToken[]
+  roles                   UserRole[]
+  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
+  targetedAuditLogs       AuditLog[]               @relation("TargetAuditLogs")
+  organizationMemberships OrganizationUser[]
+  sentInvitations         OrganizationInvitation[] @relation("InvitationInvitedBy")
+  acceptedInvitations     OrganizationInvitation[] @relation("InvitationAcceptedBy")
 
   @@index([email])
   @@index([status])
@@ -37,14 +41,14 @@ model User {
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  tokenHash String    @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  replacedBy String?  @map("replaced_by") @db.Uuid
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -54,15 +58,15 @@ model RefreshToken {
 }
 
 model ModuleEntity {
-  id          String      @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
-  code        String      @unique
+  code        String   @unique
   description String?
   icon        String?
-  sortOrder   Int         @default(0) @map("sort_order")
-  isActive    Boolean     @default(true) @map("is_active")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   subModules SubModule[]
 
@@ -71,17 +75,17 @@ model ModuleEntity {
 }
 
 model SubModule {
-  id          String         @id @default(uuid()) @db.Uuid
-  moduleId    String         @map("module_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  moduleId    String   @map("module_id") @db.Uuid
   name        String
   code        String
   description String?
-  sortOrder   Int            @default(0) @map("sort_order")
-  isActive    Boolean        @default(true) @map("is_active")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  module         ModuleEntity     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  module          ModuleEntity    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   functionalities Functionality[]
 
   @@unique([moduleId, code])
@@ -91,20 +95,20 @@ model SubModule {
 }
 
 model Functionality {
-  id          String               @id @default(uuid()) @db.Uuid
-  subModuleId String              @map("sub_module_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  subModuleId String   @map("sub_module_id") @db.Uuid
   name        String
   code        String
   description String?
   action      String
-  sortOrder   Int                 @default(0) @map("sort_order")
-  isActive    Boolean             @default(true) @map("is_active")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  subModule            SubModule  @relation(fields: [subModuleId], references: [id], onDelete: Cascade)
+  subModule              SubModule               @relation(fields: [subModuleId], references: [id], onDelete: Cascade)
   accessLevelPermissions AccessLevelPermission[]
-  rolePermissions      RolePermission[]
+  rolePermissions        RolePermission[]
 
   @@unique([subModuleId, code])
   @@index([subModuleId])
@@ -113,19 +117,19 @@ model Functionality {
 }
 
 model AccessLevel {
-  id          String                 @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
-  code        String                 @unique
+  code        String   @unique
   description String?
-  sortOrder   Int                    @default(0) @map("sort_order")
-  isSystem    Boolean                @default(false) @map("is_system")
-  isActive    Boolean                @default(true) @map("is_active")
-  createdAt   DateTime               @default(now()) @map("created_at")
-  updatedAt   DateTime               @updatedAt @map("updated_at")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  permissions       AccessLevelPermission[]
-  roleBaselines    Role[]                  @relation("RoleBaselineAccessLevel")
-  rolePermissions   RolePermission[]
+  permissions     AccessLevelPermission[]
+  roleBaselines   Role[]                  @relation("RoleBaselineAccessLevel")
+  rolePermissions RolePermission[]
 
   @@index([code])
   @@index([isActive])
@@ -133,19 +137,19 @@ model AccessLevel {
 }
 
 model AccessLevelPermission {
-  id             String        @id @default(uuid()) @db.Uuid
-  accessLevelId  String        @map("access_level_id") @db.Uuid
-  functionalityId String       @map("functionality_id") @db.Uuid
-  canView        Boolean       @default(false) @map("can_view")
-  canCreate      Boolean       @default(false) @map("can_create")
-  canEdit        Boolean       @default(false) @map("can_edit")
-  canDelete      Boolean       @default(false) @map("can_delete")
-  canApprove     Boolean       @default(false) @map("can_approve")
-  canConfigure   Boolean       @default(false) @map("can_configure")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  id              String   @id @default(uuid()) @db.Uuid
+  accessLevelId   String   @map("access_level_id") @db.Uuid
+  functionalityId String   @map("functionality_id") @db.Uuid
+  canView         Boolean  @default(false) @map("can_view")
+  canCreate       Boolean  @default(false) @map("can_create")
+  canEdit         Boolean  @default(false) @map("can_edit")
+  canDelete       Boolean  @default(false) @map("can_delete")
+  canApprove      Boolean  @default(false) @map("can_approve")
+  canConfigure    Boolean  @default(false) @map("can_configure")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  accessLevel  AccessLevel  @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+  accessLevel   AccessLevel   @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
   functionality Functionality @relation(fields: [functionalityId], references: [id], onDelete: Cascade)
 
   @@unique([accessLevelId, functionalityId])
@@ -155,42 +159,45 @@ model AccessLevelPermission {
 }
 
 model Role {
-  id                   String   @id @default(uuid()) @db.Uuid
-  name                 String
-  code                 String   @unique
-  description          String?
-  category             String?
-  organizationType     String?  @map("organization_type")
-  baselineAccessLevelId String? @map("baseline_access_level_id") @db.Uuid
-  isSystem             Boolean  @default(false) @map("is_system")
-  isActive             Boolean  @default(true) @map("is_active")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid()) @db.Uuid
+  name                  String
+  code                  String   @unique
+  description           String?
+  category              String?
+  organizationType      String?  @map("organization_type")
+  baselineAccessLevelId String?  @map("baseline_access_level_id") @db.Uuid
+  isSystem              Boolean  @default(false) @map("is_system")
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
-  baselineAccessLevel AccessLevel? @relation("RoleBaselineAccessLevel", fields: [baselineAccessLevelId], references: [id], onDelete: SetNull)
-  permissions        RolePermission[]
-  userRoles          UserRole[]
+  baselineAccessLevel     AccessLevel?             @relation("RoleBaselineAccessLevel", fields: [baselineAccessLevelId], references: [id], onDelete: SetNull)
+  permissions             RolePermission[]
+  userRoles               UserRole[]
+  organizationUserRoles   OrganizationUserRole[]
+  organizationInvitations OrganizationInvitation[]
 
   @@index([code])
   @@index([isActive])
+  @@index([organizationType])
   @@map("roles")
 }
 
 model RolePermission {
-  id             String      @id @default(uuid()) @db.Uuid
-  roleId         String      @map("role_id") @db.Uuid
-  functionalityId String     @map("functionality_id") @db.Uuid
-  accessLevelId  String?     @map("access_level_id") @db.Uuid
-  canView        Boolean?    @map("can_view")
-  canCreate      Boolean?    @map("can_create")
-  canEdit        Boolean?    @map("can_edit")
-  canDelete      Boolean?    @map("can_delete")
-  canApprove     Boolean?    @map("can_approve")
-  canConfigure   Boolean?    @map("can_configure")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id              String   @id @default(uuid()) @db.Uuid
+  roleId          String   @map("role_id") @db.Uuid
+  functionalityId String   @map("functionality_id") @db.Uuid
+  accessLevelId   String?  @map("access_level_id") @db.Uuid
+  canView         Boolean? @map("can_view")
+  canCreate       Boolean? @map("can_create")
+  canEdit         Boolean? @map("can_edit")
+  canDelete       Boolean? @map("can_delete")
+  canApprove      Boolean? @map("can_approve")
+  canConfigure    Boolean? @map("can_configure")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  role          Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role          Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
   functionality Functionality @relation(fields: [functionalityId], references: [id], onDelete: Cascade)
   accessLevel   AccessLevel?  @relation(fields: [accessLevelId], references: [id], onDelete: SetNull)
 
@@ -216,17 +223,147 @@ model UserRole {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  entityType  String   @map("entity_type")
-  entityId    String?  @map("entity_id")
-  action      String
-  actorUserId String?  @map("actor_user_id") @db.Uuid
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  action         String
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  targetUserId   String?  @map("target_user_id") @db.Uuid
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  actor User? @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actor        User?         @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  targetUser   User?         @relation("TargetAuditLogs", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@index([entityType])
   @@index([actorUserId])
+  @@index([organizationId, createdAt])
+  @@index([targetUserId])
+  @@index([action])
   @@map("audit_logs")
+}
+
+// Additional organization types are added by extending this enum in a migration;
+// roles reference the same values through roles.organization_type.
+enum OrganizationType {
+  BUYER
+  PROVIDER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum OrganizationVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum OrganizationMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum OrganizationInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+model Organization {
+  id                 String                         @id @default(uuid()) @db.Uuid
+  legalName          String                         @map("legal_name")
+  displayName        String                         @map("display_name")
+  organizationType   OrganizationType               @map("organization_type")
+  registrationNumber String?                        @map("registration_number")
+  taxId              String?                        @map("tax_id")
+  website            String?
+  description        String?
+  countryCode        String?                        @map("country_code") @db.Char(2)
+  status             OrganizationStatus             @default(ACTIVE)
+  verificationStatus OrganizationVerificationStatus @default(PENDING) @map("verification_status")
+  createdAt          DateTime                       @default(now()) @map("created_at")
+  updatedAt          DateTime                       @updatedAt @map("updated_at")
+
+  members     OrganizationUser[]
+  invitations OrganizationInvitation[]
+  auditLogs   AuditLog[]
+
+  @@index([organizationType])
+  @@index([status])
+  @@index([verificationStatus])
+  @@index([displayName])
+  @@index([registrationNumber])
+  @@map("organizations")
+}
+
+model OrganizationUser {
+  id               String                       @id @default(uuid()) @db.Uuid
+  organizationId   String                       @map("organization_id") @db.Uuid
+  userId           String                       @map("user_id") @db.Uuid
+  membershipStatus OrganizationMembershipStatus @default(INVITED) @map("membership_status")
+  isOwner          Boolean                      @default(false) @map("is_owner")
+  joinedAt         DateTime?                    @map("joined_at")
+  invitedAt        DateTime?                    @map("invited_at")
+  lastAccessedAt   DateTime?                    @map("last_accessed_at")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles        OrganizationUserRole[]
+
+  @@unique([organizationId, userId])
+  @@index([userId, membershipStatus])
+  @@index([organizationId, membershipStatus])
+  @@index([organizationId, isOwner])
+  @@map("organization_users")
+}
+
+model OrganizationUserRole {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationUserId String   @map("organization_user_id") @db.Uuid
+  roleId             String   @map("role_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  organizationUser OrganizationUser @relation(fields: [organizationUserId], references: [id], onDelete: Cascade)
+  role             Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationUserId, roleId])
+  @@index([roleId])
+  @@map("organization_user_roles")
+}
+
+model OrganizationInvitation {
+  id               String                       @id @default(uuid()) @db.Uuid
+  organizationId   String                       @map("organization_id") @db.Uuid
+  email            String
+  invitedByUserId  String?                      @map("invited_by") @db.Uuid
+  roleId           String                       @map("role_id") @db.Uuid
+  tokenHash        String                       @unique @map("token_hash")
+  expiresAt        DateTime                     @map("expires_at")
+  acceptedAt       DateTime?                    @map("accepted_at")
+  acceptedByUserId String?                      @map("accepted_by") @db.Uuid
+  status           OrganizationInvitationStatus @default(PENDING)
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  acceptedBy   User?        @relation("InvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([email, status])
+  @@index([expiresAt])
+  @@map("organization_invitations")
 }

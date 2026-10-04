@@ -56,6 +56,7 @@ export function clearSession() {
   window.localStorage.removeItem("tic_access_token");
   window.localStorage.removeItem("tic_refresh_token");
   window.localStorage.removeItem("tic_user");
+  window.localStorage.removeItem("tic_active_organization_id");
 }
 
 export function isAuthenticated() {

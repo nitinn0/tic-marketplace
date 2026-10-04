@@ -1,175 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
-import * as bcrypt from 'bcrypt';
+
+import { assignGlobalRole, DEMO_PASSWORD, DEMO_USERS, seedDemoOrganizations, seedRbac, upsertUser } from './seed-data.js';
 
 const prisma = new PrismaClient();
-
-async function upsertAccessLevel(code: string, name: string, sortOrder: number) {
-  return prisma.accessLevel.upsert({
-    where: { code },
-    update: { name, sortOrder, isActive: true },
-    create: {
-      code,
-      name,
-      sortOrder,
-      isSystem: true,
-      isActive: true,
-    },
-  });
-}
-
-async function upsertModule(code: string, name: string, sortOrder: number) {
-  return prisma.moduleEntity.upsert({
-    where: { code },
-    update: { name, sortOrder, isActive: true },
-    create: {
-      code,
-      name,
-      sortOrder,
-      isActive: true,
-    },
-  });
-}
-
-async function upsertSubModule(moduleId: string, code: string, name: string, sortOrder: number) {
-  return prisma.subModule.upsert({
-    where: {
-      moduleId_code: {
-        moduleId,
-        code,
-      },
-    },
-    update: { name, sortOrder, isActive: true },
-    create: {
-      moduleId,
-      code,
-      name,
-      sortOrder,
-      isActive: true,
-    },
-  });
-}
-
-async function upsertFunctionality(
-  subModuleId: string,
-  code: string,
-  name: string,
-  action: string,
-  sortOrder: number,
-) {
-  return prisma.functionality.upsert({
-    where: {
-      subModuleId_code: {
-        subModuleId,
-        code,
-      },
-    },
-    update: { name, action, sortOrder, isActive: true },
-    create: {
-      subModuleId,
-      code,
-      name,
-      action,
-      sortOrder,
-      isActive: true,
-    },
-  });
-}
-
-async function upsertRole(
-  code: string,
-  name: string,
-  baselineAccessLevelId: string | null,
-  category: string,
-) {
-  return prisma.role.upsert({
-    where: { code },
-    update: {
-      name,
-      baselineAccessLevelId,
-      category,
-      isActive: true,
-      isSystem: true,
-    },
-    create: {
-      code,
-      name,
-      baselineAccessLevelId,
-      category,
-      isSystem: true,
-      isActive: true,
-    },
-  });
-}
-
-async function upsertRolePermission(
-  roleId: string,
-  functionalityId: string,
-  accessLevelId: string | null,
-  values: {
-    canView?: boolean;
-    canCreate?: boolean;
-    canEdit?: boolean;
-    canDelete?: boolean;
-    canApprove?: boolean;
-    canConfigure?: boolean;
-  },
-) {
-  return prisma.rolePermission.upsert({
-    where: {
-      roleId_functionalityId: {
-        roleId,
-        functionalityId,
-      },
-    },
-    update: {
-      accessLevelId,
-      canView: values.canView ?? null,
-      canCreate: values.canCreate ?? null,
-      canEdit: values.canEdit ?? null,
-      canDelete: values.canDelete ?? null,
-      canApprove: values.canApprove ?? null,
-      canConfigure: values.canConfigure ?? null,
-    },
-    create: {
-      roleId,
-      functionalityId,
-      accessLevelId,
-      canView: values.canView ?? null,
-      canCreate: values.canCreate ?? null,
-      canEdit: values.canEdit ?? null,
-      canDelete: values.canDelete ?? null,
-      canApprove: values.canApprove ?? null,
-      canConfigure: values.canConfigure ?? null,
-    },
-  });
-}
-
-async function assignRoleToUser(userEmail: string, roleCode: string) {
-  const user = await prisma.user.findUnique({ where: { email: userEmail } });
-  if (!user) {
-    return;
-  }
-
-  const role = await prisma.role.findUnique({ where: { code: roleCode } });
-  if (!role) {
-    return;
-  }
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: user.id,
-        roleId: role.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: user.id,
-      roleId: role.id,
-    },
-  });
-}
 
 async function upsertSupabaseAuthUser(
   email: string,
@@ -222,137 +56,23 @@ async function upsertSupabaseAuthUser(
   }
 }
 
-async function upsertUser(email: string, firstName: string, lastName: string, password: string) {
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  return prisma.user.upsert({
-    where: { email },
-    update: {
-      firstName,
-      lastName,
-      passwordHash,
-      status: 'ACTIVE',
-      emailVerifiedAt: new Date(),
-    },
-    create: {
-      email,
-      firstName,
-      lastName,
-      passwordHash,
-      status: 'ACTIVE',
-      emailVerifiedAt: new Date(),
-    },
-  });
-}
-
 async function main() {
-  const viewerLevel = await upsertAccessLevel('VIEWER', 'Viewer', 1);
-  const editorLevel = await upsertAccessLevel('EDITOR', 'Editor', 2);
-  const adminLevel = await upsertAccessLevel('ADMIN', 'Administrator', 3);
-  await upsertAccessLevel('CREATOR', 'Creator', 4);
+  await seedRbac(prisma);
 
-  const platformModule = await upsertModule('platform', 'Platform', 1);
-  const rbacModule = await upsertModule('rbac', 'RBAC', 2);
+  const { email, firstName, lastName } = DEMO_USERS.superAdmin;
+  const superAdminUser = await upsertUser(prisma, DEMO_USERS.superAdmin);
+  await upsertSupabaseAuthUser(email, DEMO_PASSWORD, firstName, lastName);
 
-  const platformSettingsSubmodule = await upsertSubModule(
-    platformModule.id,
-    'platform_settings',
-    'Platform Settings',
-    1,
-  );
-  const rbacMgmtSubmodule = await upsertSubModule(
-    rbacModule.id,
-    'rbac_management',
-    'RBAC Management',
-    1,
-  );
+  await assignGlobalRole(prisma, superAdminUser.id, 'SUPER_ADMIN');
+  const alice = await prisma.user.findUnique({ where: { email: 'alice+test@example.com' } });
+  if (alice) {
+    await assignGlobalRole(prisma, alice.id, 'USER');
+  }
 
-  const platformOverview = await upsertFunctionality(
-    platformSettingsSubmodule.id,
-    'platform.overview',
-    'Platform Overview',
-    'view',
-    1,
-  );
-  const roleManagement = await upsertFunctionality(
-    rbacMgmtSubmodule.id,
-    'rbac.manage_roles',
-    'Manage Roles',
-    'view',
-    1,
-  );
-  const moduleManagement = await upsertFunctionality(
-    rbacMgmtSubmodule.id,
-    'rbac.manage_modules',
-    'Manage Modules',
-    'view',
-    2,
-  );
-  const accessLevelManagement = await upsertFunctionality(
-    rbacMgmtSubmodule.id,
-    'rbac.manage_access_levels',
-    'Manage Access Levels',
-    'view',
-    3,
-  );
-
-  const superAdminRole = await upsertRole('SUPER_ADMIN', 'Super Admin', adminLevel.id, 'system');
-  const adminRole = await upsertRole('ADMIN', 'Administrator', adminLevel.id, 'system');
-  const userRole = await upsertRole('USER', 'User', viewerLevel.id, 'platform');
-
-  const superAdminUser = await upsertUser('bob+auth@example.com', 'Bob', 'Auth', 'password123');
-  await upsertSupabaseAuthUser('bob+auth@example.com', 'password123', 'Bob', 'Auth');
-
-  await assignRoleToUser(superAdminUser.email, 'SUPER_ADMIN');
-  await assignRoleToUser('alice+test@example.com', 'USER');
-
-  await upsertRolePermission(superAdminRole.id, platformOverview.id, adminLevel.id, {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-    canConfigure: true,
-  });
-
-  await upsertRolePermission(superAdminRole.id, roleManagement.id, adminLevel.id, {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-    canConfigure: true,
-  });
-
-  await upsertRolePermission(superAdminRole.id, moduleManagement.id, adminLevel.id, {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-    canConfigure: true,
-  });
-
-  await upsertRolePermission(superAdminRole.id, accessLevelManagement.id, adminLevel.id, {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-    canConfigure: true,
-  });
-
-  await upsertRolePermission(adminRole.id, roleManagement.id, editorLevel.id, {
-    canView: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: false,
-    canConfigure: false,
-  });
-
-  await upsertRolePermission(userRole.id, platformOverview.id, viewerLevel.id, {
-    canView: true,
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-    canConfigure: false,
-  });
+  if (process.env.SEED_DEMO_ORGANIZATIONS !== 'false') {
+    await seedDemoOrganizations(prisma);
+    console.log('Demo organizations seeded (set SEED_DEMO_ORGANIZATIONS=false to skip)');
+  }
 
   console.log('RBAC seed completed successfully');
 }

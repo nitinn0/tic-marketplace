@@ -1,5 +1,7 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
+import { IsOptionalOrganizationType } from './organization-type.transform.js';
+
 export class UpdateRoleDto {
   @IsOptional()
   @IsString()
@@ -17,9 +19,8 @@ export class UpdateRoleDto {
   @IsString()
   category?: string;
 
-  @IsOptional()
-  @IsString()
-  organizationType?: string;
+  @IsOptionalOrganizationType()
+  organizationType?: string | null;
 
   @IsOptional()
   @IsString()

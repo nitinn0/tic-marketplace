@@ -86,12 +86,14 @@ const categoryOptions = [
   { value: "support", label: "Support" },
   { value: "content", label: "Content" },
   { value: "evaluation", label: "Evaluation" },
+  { value: "organization", label: "Organization" },
+  { value: "professional", label: "Professional" },
 ];
 
-const instituteTypeOptions = [
-  { value: "school", label: "School" },
-  { value: "university", label: "University" },
-  { value: "both", label: "Both (School & University)" },
+// Roles with an organization type are organization-scoped and assigned through organization membership.
+const organizationTypeOptions = [
+  { value: "BUYER", label: "Buyer organization" },
+  { value: "PROVIDER", label: "Provider organization" },
 ];
 
 const permissionColumns: Array<{ flag: PermissionFlag; label: string }> = [
@@ -342,6 +344,11 @@ function RoleDetailsPanel({
       ? [...categoryOptions, { value: draft.category, label: draft.category }]
       : categoryOptions;
 
+  const organizationTypeChoices =
+    draft.organizationType && !organizationTypeOptions.some((option) => option.value === draft.organizationType)
+      ? [...organizationTypeOptions, { value: draft.organizationType, label: `${draft.organizationType} (unsupported)` }]
+      : organizationTypeOptions;
+
   const updateDraft = <K extends keyof RoleDraft>(key: K, value: RoleDraft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
@@ -541,15 +548,15 @@ function RoleDetailsPanel({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">Institute type</span>
+          <span className="mb-1.5 block text-sm font-medium text-slate-700">Organization type</span>
           <select
             value={draft.organizationType}
             onChange={(e) => updateDraft("organizationType", e.target.value)}
             disabled={!isEditing}
             className={fieldClass}
           >
-            <option value="">Not institute specific</option>
-            {instituteTypeOptions.map((option) => (
+            <option value="">Global role (not organization scoped)</option>
+            {organizationTypeChoices.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

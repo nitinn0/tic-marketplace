@@ -10,6 +10,9 @@ import { SupabaseModule } from './common/supabase/supabase.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { RbacModule } from './modules/rbac/rbac.module.js';
+import { AuditModule } from './common/audit/audit.module.js';
+import { MailModule } from './common/mail/mail.module.js';
+import { OrganizationsModule } from './modules/organizations/organizations.module.js';
 
 @Module({
   imports: [
@@ -20,9 +23,12 @@ import { RbacModule } from './modules/rbac/rbac.module.js';
     }),
     DatabaseModule,
     SupabaseModule,
+    AuditModule,
+    MailModule,
     AuthModule,
     UsersModule,
     RbacModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

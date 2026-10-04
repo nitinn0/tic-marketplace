@@ -57,25 +57,28 @@ export default function RbacAdminPage() {
   const [moduleDraft, setModuleDraft] = useState({ name: "", code: "", description: "" });
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
 
+  const fetchData = () =>
+    Promise.all([
+      api.get<ModuleEntity[]>("/rbac/modules"),
+      api.get<AccessLevel[]>("/rbac/access-levels"),
+      api.get<RbacRole[]>("/rbac/roles"),
+    ])
+      .then(([modulesData, levelsData, rolesData]) => {
+        setModules(modulesData);
+        setAccessLevels(levelsData);
+        setRoles(rolesData);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Unable to load RBAC data.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
   const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [modulesData, levelsData, rolesData] = await Promise.all([
-        api.get<ModuleEntity[]>("/rbac/modules"),
-        api.get<AccessLevel[]>("/rbac/access-levels"),
-        api.get<RbacRole[]>("/rbac/roles"),
-      ]);
-
-      setModules(modulesData);
-      setAccessLevels(levelsData);
-      setRoles(rolesData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load RBAC data.");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    setError(null);
+    await fetchData();
   };
 
   const reloadRoles = async () => {
@@ -83,7 +86,7 @@ export default function RbacAdminPage() {
   };
 
   useEffect(() => {
-    void loadData();
+    void fetchData();
   }, []);
 
   const activeCount = useMemo(() => {

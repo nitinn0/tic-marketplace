@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { appName, routes } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { OrganizationSwitcher } from "@/features/organizations/components/organization-switcher";
 
 export function Header() {
   return (
@@ -26,12 +27,16 @@ export function Header() {
           <Link href={routes.dashboard} className="transition hover:text-sky-700">
             Dashboard
           </Link>
+          <Link href={routes.organizations} className="transition hover:text-sky-700">
+            Organizations
+          </Link>
           <Link href={routes.adminRbac} className="transition hover:text-sky-700">
             RBAC
           </Link>
         </nav>
 
         <div className="flex items-center gap-3">
+          <OrganizationSwitcher />
           <Button variant="secondary" size="sm" type="button">
             For buyers
           </Button>

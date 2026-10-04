@@ -8,6 +8,9 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../../database/prisma.service.js';
+import { OrganizationAccessService } from '../rbac/services/organization-access.service.js';
+import { PermissionResolverService } from '../rbac/services/permission-resolver.service.js';
+import { isRoleCompatibleWithOrganization } from '../rbac/utils/role-scope.util.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
@@ -31,6 +34,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly organizationAccess: OrganizationAccessService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -157,8 +161,21 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: requestUser.sub },
       include: {
-        roles: {
-          include: { role: { include: { permissions: { include: { functionality: true } } } } },
+        organizationMemberships: {
+          where: { membershipStatus: { in: ['ACTIVE', 'SUSPENDED'] } },
+          orderBy: [{ lastAccessedAt: { sort: 'desc', nulls: 'last' } }, { joinedAt: 'asc' }],
+          select: {
+            membershipStatus: true,
+            isOwner: true,
+            organization: {
+              select: { id: true, displayName: true, organizationType: true, status: true },
+            },
+            roles: {
+              select: {
+                role: { select: { id: true, code: true, name: true, organizationType: true, isActive: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -167,27 +184,37 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const permissions = user.roles.flatMap(({ role }) =>
-      role.permissions.map((permission) => ({
-        functionalityCode: permission.functionality.code,
-        accessLevelId: permission.accessLevelId,
-        canView: permission.canView ?? false,
-        canCreate: permission.canCreate ?? false,
-        canEdit: permission.canEdit ?? false,
-        canDelete: permission.canDelete ?? false,
-        canApprove: permission.canApprove ?? false,
-        canConfigure: permission.canConfigure ?? false,
-      })),
-    );
+    const [globalRoles, globalPermissions] = await Promise.all([
+      this.organizationAccess.getGlobalRoles(user.id),
+      this.organizationAccess.getGlobalPermissions(user.id),
+    ]);
+
+    const organizations = user.organizationMemberships.map((membership) => ({
+      id: membership.organization.id,
+      displayName: membership.organization.displayName,
+      organizationType: membership.organization.organizationType,
+      status: membership.organization.status,
+      membershipStatus: membership.membershipStatus,
+      isOwner: membership.isOwner,
+      roles: membership.roles
+        .map(({ role }) => role)
+        .filter((role) => isRoleCompatibleWithOrganization(role, membership.organization.organizationType))
+        .map(({ id, code, name }) => ({ id, code, name })),
+    }));
+
+    // Memberships are ordered by last switch, so the first active one is the default context.
+    const activeOrganizationId =
+      organizations.find((organization) => organization.membershipStatus === 'ACTIVE')?.id ?? null;
 
     return {
       user: this.publicUser(user),
-      roles: user.roles.map(({ role }) => ({
-        id: role.id,
-        name: role.name,
-        code: role.code,
-      })),
-      permissions,
+      globalRoles,
+      /** @deprecated Phase 2 alias of globalRoles. */
+      roles: globalRoles,
+      /** Effective global (platform) permissions. Organization permissions come from /organizations/:id/permissions. */
+      permissions: PermissionResolverService.toList(globalPermissions),
+      organizations,
+      activeOrganizationId,
     };
   }
 

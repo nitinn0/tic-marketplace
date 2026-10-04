@@ -191,6 +191,12 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
     status: string;
   }>(appUser);
 
+  const globalRoles = roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    code: role.code,
+  }));
+
   return {
     user: {
       id: user.id,
@@ -200,12 +206,12 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
       phone: user.phone,
       status: user.status,
     },
-    roles: roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      code: role.code,
-    })),
+    globalRoles,
+    roles: globalRoles,
     permissions,
+    // Organization membership and scoped permissions are only served by the Nest API.
+    organizations: [],
+    activeOrganizationId: null,
   };
 }
 

@@ -75,8 +75,9 @@ cd ../backend && npm install
 cd backend
 cp .env.example .env
 npm install
+npx prisma migrate dev     # applies prisma/migrations (never edit the schema by hand)
 npx prisma generate
-npx prisma db push
+npx prisma db seed         # RBAC catalogue, super admin and Phase 3 demo organizations
 npm run start:dev
 ```
 
@@ -104,7 +105,8 @@ The frontend runs on:
 cd backend
 npx prisma generate
 npx prisma validate
-npx prisma db push
+npx prisma migrate dev --name <change>   # create + apply a migration locally
+npx prisma migrate deploy                # apply migrations in deployed environments (Render does this on start)
 npx prisma studio
 ```
 
@@ -123,7 +125,50 @@ Expected response:
 }
 ```
 
+## Organizations (Phase 3)
+
+Buyer and provider companies are modelled as organizations. Users join them through memberships and receive
+organization-scoped roles, which are resolved by the same Phase 2 permission engine as global roles.
+
+- Tables: `organizations`, `organization_users`, `organization_user_roles`, `organization_invitations`
+  (`audit_logs` gained `organization_id` and `target_user_id`).
+- Roles with `roles.organization_type` set (`BUYER`/`PROVIDER`) are organization roles and can only be granted inside
+  a matching organization. Roles without it remain global roles (`user_roles`).
+- Organization-scoped endpoints take the organization from the URL, or from the `X-Organization-Id` header for
+  context endpoints. The backend always re-validates it against the caller's active membership; non-members get `404`.
+- Only global roles granting `organizations.platform_access` (seeded for `SUPER_ADMIN`) can reach organizations
+  without a membership. `ADMIN` does not.
+
+Demo accounts (password `password123`, created by `npx prisma db seed`):
+
+| User | Organizations |
+| --- | --- |
+| `bob+auth@example.com` | Super admin (platform access) |
+| `john@example.com` | ABC Certification — owner, Provider Admin |
+| `rahul@example.com` | ABC Certification — Provider User; Acme Industries — Buyer Admin |
+| `priya@example.com` | XYZ Testing Labs — owner, Provider Admin |
+| `ananya@example.com` | Acme Industries — owner, Buyer Admin |
+
+Set `SEED_DEMO_ORGANIZATIONS=false` to skip the demo organizations.
+
+Invitation emails go through `MailService`. With the default `MAIL_TRANSPORT=log` they are written to the backend log,
+and outside production the invite response also returns the accept link so the flow can be completed locally.
+Invitation tokens are stored only as SHA-256 hashes.
+
+## Tests
+
+```bash
+cd backend
+npm test            # unit tests
+npm run test:e2e    # API tests against a local database
+```
+
+The e2e suite resets and seeds `tic_marketplace_test` on the Docker Postgres (`localhost:5434`). It refuses to run
+against a non-local database or one whose name does not contain `test`; override with `TEST_DATABASE_URL`.
+
 ## Notes
 
 - Phase 1 intentionally excludes authentication, onboarding, bidding, RFQ workflows, and provider management.
+- Organization features require the Nest API. The Next.js fallback API under `/api/v1` (used when the frontend runs
+  on a remote host without `NEXT_PUBLIC_API_URL`) returns an empty `organizations` list.
 - The app follows a modular monolith pattern and keeps the infrastructure intentionally simple.

@@ -21,6 +21,12 @@ type LoginResponse = {
   };
 };
 
+/** Only same-origin relative paths are honoured to avoid open redirects. */
+function getRedirectTarget() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : routes.dashboard;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("bob+auth@example.com");
@@ -53,7 +59,7 @@ export default function LoginPage() {
             status: "ACTIVE",
           }),
         );
-        router.push(routes.dashboard);
+        router.push(getRedirectTarget());
         router.refresh();
         return;
       }
@@ -62,7 +68,7 @@ export default function LoginPage() {
       window.localStorage.setItem("tic_access_token", result.accessToken);
       window.localStorage.setItem("tic_refresh_token", result.refreshToken);
       window.localStorage.setItem("tic_user", JSON.stringify(result.user));
-      router.push(routes.dashboard);
+      router.push(getRedirectTarget());
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");

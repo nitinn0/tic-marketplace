@@ -1,5 +1,7 @@
 import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
+import { IsOptionalOrganizationType } from './organization-type.transform.js';
+
 export class CreateRoleDto {
   @IsString()
   @MinLength(2)
@@ -17,9 +19,8 @@ export class CreateRoleDto {
   @IsString()
   category?: string;
 
-  @IsOptional()
-  @IsString()
-  organizationType?: string;
+  @IsOptionalOrganizationType()
+  organizationType?: string | null;
 
   @IsOptional()
   @IsString()

@@ -3,10 +3,24 @@ import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../../database/prisma.service.js';
+import { OrganizationAccessService } from './services/organization-access.service.js';
+import { PermissionResolverService } from './services/permission-resolver.service.js';
+import { isGlobalRole, normalizeOrganizationType } from './utils/role-scope.util.js';
+
+function assertGlobalRole(role: { code: string; organizationType: string | null }) {
+  if (!isGlobalRole(role)) {
+    throw new BadRequestException(
+      `${role.code} is an organization role (${role.organizationType}); assign it through organization membership`,
+    );
+  }
+}
 
 @Injectable()
 export class RbacService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly organizationAccess: OrganizationAccessService,
+  ) {}
 
   async getModules() {
     return this.prisma.moduleEntity.findMany({
@@ -147,14 +161,14 @@ export class RbacService {
     return role;
   }
 
-  async createRole(dto: { name: string; code: string; description?: string; category?: string; organizationType?: string; baselineAccessLevelId?: string; isSystem?: boolean; isActive?: boolean }) {
+  async createRole(dto: { name: string; code: string; description?: string; category?: string; organizationType?: string | null; baselineAccessLevelId?: string; isSystem?: boolean; isActive?: boolean }) {
     return this.prisma.role.create({
       data: {
         name: dto.name,
         code: dto.code,
         description: dto.description,
         category: dto.category,
-        organizationType: dto.organizationType,
+        organizationType: normalizeOrganizationType(dto.organizationType),
         baselineAccessLevelId: dto.baselineAccessLevelId ?? null,
         isSystem: dto.isSystem ?? false,
         isActive: dto.isActive ?? true,
@@ -162,7 +176,7 @@ export class RbacService {
     });
   }
 
-  async updateRole(id: string, dto: { name?: string; code?: string; description?: string; category?: string; organizationType?: string; baselineAccessLevelId?: string; isActive?: boolean }) {
+  async updateRole(id: string, dto: { name?: string; code?: string; description?: string; category?: string; organizationType?: string | null; baselineAccessLevelId?: string; isActive?: boolean }) {
     const role = await this.prisma.role.findUnique({ where: { id } });
     if (!role) {
       throw new NotFoundException('Role not found');
@@ -172,9 +186,15 @@ export class RbacService {
       throw new BadRequestException('Protected system roles cannot be renamed');
     }
 
+    const { organizationType, ...rest } = dto;
     return this.prisma.role.update({
       where: { id },
-      data: dto,
+      data: {
+        ...rest,
+        ...(organizationType !== undefined
+          ? { organizationType: normalizeOrganizationType(organizationType) }
+          : {}),
+      },
     });
   }
 
@@ -299,6 +319,7 @@ export class RbacService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    assertGlobalRole(role);
 
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -348,6 +369,10 @@ export class RbacService {
     const toRemove = [...currentIds].filter((id) => !desired.has(id));
     const toAdd = [...desired].filter((id) => !currentIds.has(id));
 
+    if (toAdd.length > 0) {
+      assertGlobalRole(role);
+    }
+
     if (role.isSystem && toRemove.length > 0) {
       throw new BadRequestException('Protected system roles cannot be removed from users');
     }
@@ -375,6 +400,7 @@ export class RbacService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    assertGlobalRole(role);
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -405,92 +431,27 @@ export class RbacService {
     return { success: true };
   }
 
-  async hasPermission(userContext: { sub: string }, functionalityCode: string, action: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userContext.sub },
-      include: {
-        roles: {
-          include: {
-            role: {
-              include: {
-                baselineAccessLevel: true,
-                permissions: { include: { functionality: true, accessLevel: true } },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      return false;
-    }
-
-    const actionName = action.toLowerCase();
-    const permissionMatrix: Array<{
-      canView?: boolean | null;
-      canCreate?: boolean | null;
-      canEdit?: boolean | null;
-      canDelete?: boolean | null;
-      canApprove?: boolean | null;
-      canConfigure?: boolean | null;
-      functionality: { code: string };
-    }> = [];
-
-    for (const userRole of user.roles) {
-      const role = userRole.role;
-
-      const baselinePermissionMap = await this.prisma.accessLevelPermission.findMany({
-        where: { accessLevelId: role.baselineAccessLevelId ?? undefined },
-        include: { functionality: true },
-      });
-
-      for (const entry of baselinePermissionMap) {
-        permissionMatrix.push({
-          canView: entry.canView,
-          canCreate: entry.canCreate,
-          canEdit: entry.canEdit,
-          canDelete: entry.canDelete,
-          canApprove: entry.canApprove,
-          canConfigure: entry.canConfigure,
-          functionality: entry.functionality,
-        });
-      }
-
-      for (const entry of role.permissions) {
-        const idx = permissionMatrix.findIndex((item) => item.functionality.code === entry.functionality.code);
-        const permissionValues = {
-          canView: entry.canView ?? null,
-          canCreate: entry.canCreate ?? null,
-          canEdit: entry.canEdit ?? null,
-          canDelete: entry.canDelete ?? null,
-          canApprove: entry.canApprove ?? null,
-          canConfigure: entry.canConfigure ?? null,
-          functionality: entry.functionality,
-        };
-
-        if (idx >= 0) {
-          permissionMatrix[idx] = permissionValues;
-        } else {
-          permissionMatrix.push(permissionValues);
-        }
+  /**
+   * Without an organization id this evaluates global (user_roles) permissions only.
+   * With an organization id it evaluates the user's roles in that organization, after verifying
+   * an ACTIVE membership (or platform-level access granted through global roles).
+   */
+  async hasPermission(
+    userContext: { sub: string },
+    functionalityCode: string,
+    action: string,
+    options: { organizationId?: string } = {},
+  ) {
+    if (options.organizationId) {
+      try {
+        const context = await this.organizationAccess.resolve(userContext.sub, options.organizationId);
+        return this.organizationAccess.can(context, functionalityCode, action);
+      } catch {
+        return false;
       }
     }
 
-    const permission = permissionMatrix.find((entry) => entry.functionality.code === functionalityCode);
-    if (!permission) {
-      return false;
-    }
-
-    const actionFlags = {
-      view: permission.canView ?? false,
-      create: permission.canCreate ?? false,
-      edit: permission.canEdit ?? false,
-      delete: permission.canDelete ?? false,
-      approve: permission.canApprove ?? false,
-      configure: permission.canConfigure ?? false,
-    };
-
-    return actionFlags[actionName as keyof typeof actionFlags] ?? false;
+    const permissions = await this.organizationAccess.getGlobalPermissions(userContext.sub);
+    return PermissionResolverService.allows(permissions, functionalityCode, action);
   }
 }

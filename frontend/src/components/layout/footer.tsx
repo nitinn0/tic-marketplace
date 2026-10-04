@@ -27,7 +27,7 @@ export function Footer() {
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
             Services
-          </h3>
+          </h3> 
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
             <li>Testing</li>
             <li>Inspection</li>

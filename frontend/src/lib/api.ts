@@ -102,7 +102,7 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
   const activeOrganizationId = getActiveOrganizationId();
-  if (activeOrganizationId && !usesSupabaseAuth() && !headers.has("X-Organization-Id")) {
+  if (activeOrganizationId && !headers.has("X-Organization-Id")) {
     headers.set("X-Organization-Id", activeOrganizationId);
   }
 

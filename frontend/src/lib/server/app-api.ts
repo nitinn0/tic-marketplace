@@ -1,3 +1,4 @@
+import { getMeOrganizations, handleOrganizationsApi, OrganizationsApiError } from "@/lib/server/organizations-api";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 
 type JsonMap = Record<string, unknown>;
@@ -209,9 +210,7 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
     globalRoles,
     roles: globalRoles,
     permissions,
-    // Organization membership and scoped permissions are only served by the Nest API.
-    organizations: [],
-    activeOrganizationId: null,
+    ...(await getMeOrganizations(user.id)),
   };
 }
 
@@ -320,6 +319,12 @@ export async function handleAppApi(request: Request, path: string) {
 
     if (method === "GET" && path === "auth/me") {
       return json(await getCurrentProfile(authUser));
+    }
+
+    const appUser = await resolveAppUser(authUser);
+    const organizationsResponse = await handleOrganizationsApi(request, path, appUser);
+    if (organizationsResponse) {
+      return organizationsResponse;
     }
 
     if (method === "GET" && path === "rbac/modules") {
@@ -750,7 +755,7 @@ export async function handleAppApi(request: Request, path: string) {
 
     throw new ApiError("Not found", 404);
   } catch (error) {
-    if (error instanceof ApiError) {
+    if (error instanceof ApiError || error instanceof OrganizationsApiError) {
       return json({ message: error.message }, error.status);
     }
 

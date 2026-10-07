@@ -9,6 +9,30 @@ export const ORGANIZATION_FUNCTIONALITIES = {
   ownership: "organizations.ownership",
 } as const;
 
+/** Mirrors backend MARKETPLACE_FUNCTIONALITIES (taxonomy master data, global roles). */
+export const MARKETPLACE_FUNCTIONALITIES = {
+  categories: "marketplace.categories",
+  services: "marketplace.services",
+  standards: "marketplace.standards",
+  industries: "marketplace.industries",
+  locations: "marketplace.locations",
+} as const;
+
+/** Mirrors backend PROVIDER_FUNCTIONALITIES (organization roles). */
+export const PROVIDER_FUNCTIONALITIES = {
+  profile: "providers.profile",
+  services: "providers.services",
+  standards: "providers.standards",
+  industries: "providers.industries",
+  locations: "providers.locations",
+} as const;
+
+/** Mirrors backend PROFESSIONAL_FUNCTIONALITIES (global roles). */
+export const PROFESSIONAL_FUNCTIONALITIES = {
+  profile: "professionals.profile",
+  experience: "professionals.experience",
+} as const;
+
 const ACTION_TO_FLAG: Record<PermissionAction, keyof Omit<PermissionEntry, "functionalityCode">> = {
   view: "canView",
   create: "canCreate",

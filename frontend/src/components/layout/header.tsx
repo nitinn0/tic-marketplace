@@ -4,6 +4,8 @@ import { appName, routes } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { OrganizationSwitcher } from "@/features/organizations/components/organization-switcher";
 
+import { MarketplaceNavLinks } from "./marketplace-nav-links";
+
 export function Header() {
   return (
     <header className="border-b border-slate-200 bg-white/90 backdrop-blur-sm">
@@ -30,6 +32,7 @@ export function Header() {
           <Link href={routes.organizations} className="transition hover:text-sky-700">
             Organizations
           </Link>
+          <MarketplaceNavLinks />
           <Link href={routes.adminRbac} className="transition hover:text-sky-700">
             RBAC
           </Link>

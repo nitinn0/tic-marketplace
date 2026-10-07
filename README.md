@@ -155,6 +155,54 @@ Invitation emails go through `MailService`. With the default `MAIL_TRANSPORT=log
 and outside production the invite response also returns the accept link so the flow can be completed locally.
 Invitation tokens are stored only as SHA-256 hashes.
 
+## Taxonomy and profiles (Phase 4)
+
+Marketplace master data plus the profiles providers and individual professionals fill in from it. Search, matching,
+RFQs and verification workflows are not part of this phase.
+
+- Taxonomy tables: `service_categories` (hierarchical, typed), `services`, `standards`, `industries` (hierarchical),
+  `locations` (country → state → city → postal code).
+- Provider tables: `provider_profiles` (one per `PROVIDER` organization, keyed by `organization_id`) and the
+  capability joins `provider_services`, `provider_standards`, `provider_industries`, `provider_locations`
+  (with `coverage_type`).
+- Professional tables: `professional_profiles` (one per user) and `professional_experience`.
+- Taxonomy records that providers already use are deactivated instead of deleted. Inactive records (or records under
+  an inactive parent) cannot be newly assigned, but existing assignments are kept and flagged.
+- Active, verified and public are separate flags. Profiles start private with `verification_status = PENDING`; no
+  endpoint lets a provider or professional change their verification status.
+- A provider profile is publicly visible only when `public_profile` is true and its organization is an `ACTIVE`
+  `PROVIDER` (`PUBLIC_PROVIDER_PROFILE_WHERE`). A professional profile needs `public_profile` and an `ACTIVE` user.
+  The rule lives in the service layer; there is no public listing API yet.
+
+APIs (all under `/api/v1`, JWT required):
+
+| Area | Endpoints | Permission |
+| --- | --- | --- |
+| Taxonomy admin | `GET/POST /taxonomy/{categories,services,standards,industries,locations}`, `GET/PATCH/DELETE …/:id` | global `marketplace.*` |
+| Provider profile | `GET/POST/PATCH /provider/profile`, `GET /provider/catalog` | org-scoped `providers.profile` |
+| Provider capabilities | `GET/PUT/POST /provider/profile/{services,standards,industries,locations}`, `DELETE …/:id` | org-scoped `providers.*` |
+| Professional profile | `GET/POST/PATCH /professional/profile`, `GET/POST /professional/experience`, `PATCH/DELETE …/:id` | global `professionals.*` |
+
+Taxonomy list endpoints accept `search`, `active=true|false` and, where relevant, `parentId`, `categoryId`,
+`categoryType`, `countryCode` and `format=tree` (categories and industries). Provider endpoints take the organization from
+`X-Organization-Id` and reject `BUYER` organizations with `403`. `PUT` replaces a capability set.
+
+Seeded grants: `SUPER_ADMIN` has full taxonomy and provider access; `ADMIN` can view, create and edit taxonomy but not
+delete it, and has no provider access; `PROVIDER_ADMIN` edits the profile and manages capabilities; `PROVIDER_USER` is
+view-only; `PROFESSIONAL` manages its own profile and experience. Provider roles never receive taxonomy permissions.
+
+Additional demo data: XYZ Testing Labs has a public testing-lab profile; ABC Certification has none yet. New accounts
+(password `password123`):
+
+| User | Role |
+| --- | --- |
+| `arjun@example.com` | Professional, with a lead auditor profile and two experience entries |
+| `meera@example.com` | Professional, no profile yet |
+
+Frontend pages: `/admin/taxonomy`, `/provider/profile` (uses the organization selected in the header switcher; hidden
+for buyer organizations) and `/professional/profile`. Header links appear only when the user has the matching
+permission.
+
 ## Tests
 
 ```bash
@@ -170,5 +218,6 @@ against a non-local database or one whose name does not contain `test`; override
 
 - Phase 1 intentionally excludes authentication, onboarding, bidding, RFQ workflows, and provider management.
 - Organization features require the Nest API. The Next.js fallback API under `/api/v1` (used when the frontend runs
-  on a remote host without `NEXT_PUBLIC_API_URL`) returns an empty `organizations` list.
+  on a remote host without `NEXT_PUBLIC_API_URL`) returns an empty `organizations` list. It does not implement the
+  Phase 4 taxonomy, provider or professional endpoints either.
 - The app follows a modular monolith pattern and keeps the infrastructure intentionally simple.

@@ -160,6 +160,27 @@ function emptyToNull(value: unknown) {
 
 type RoleRef = { id: string; code: string; name: string; organizationType: string | null; isActive: boolean };
 
+function asObject(value: unknown): JsonMap | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return Array.isArray(value) ? asObject(value[0]) : null;
+  }
+  return value as JsonMap;
+}
+
+function roleFromRelation(value: unknown): RoleRef | null {
+  const role = camelize<RoleRef | null>(asObject(value));
+  return role?.id ? role : null;
+}
+
+function rolesFromAssignments(value: unknown): RoleRef[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => roleFromRelation(asObject(entry)?.role ?? entry))
+    .filter((role): role is RoleRef => Boolean(role));
+}
+
 type OrgAccess = {
   userId: string;
   organization: {
@@ -290,9 +311,9 @@ async function getGlobalRoles(userId: string) {
   if (error) {
     throw new OrganizationsApiError(error.message, 500);
   }
-  return ((data ?? []) as Array<{ role: JsonMap | null }>)
-    .map((entry) => camelize<RoleRef>(entry.role))
-    .filter((role) => role?.id && role.isActive && isGlobalRole(role));
+  return (data ?? [])
+    .map((entry) => roleFromRelation(entry.role))
+    .filter((role): role is RoleRef => Boolean(role?.id && role.isActive && isGlobalRole(role)));
 }
 
 async function getGlobalPermissions(userId: string, userStatus: string) {
@@ -398,9 +419,9 @@ async function resolveAccess(userId: string, userStatus: string, organizationId:
     : null;
 
   if (membership?.membership_status === "ACTIVE") {
-    const roles = ((membership.roles as Array<{ role: JsonMap | null }> | null) ?? [])
-      .map((entry) => camelize<RoleRef>(entry.role))
-      .filter((role) => role?.id && isCompatible(role, org.organizationType));
+    const roles = rolesFromAssignments(membership.roles).filter((role) =>
+      isCompatible(role, org.organizationType),
+    );
     const organizationPermissions = await resolvePermissions(roles.map((role) => role.id));
     const permissions = hasPlatformAccess
       ? (() => {
@@ -486,9 +507,8 @@ export async function getMeOrganizations(userId: string) {
       if (!organization?.id) {
         return [];
       }
-      const roles = ((row.roles as Array<{ role: JsonMap | null }> | null) ?? [])
-        .map((entry) => camelize<RoleRef>(entry.role))
-        .filter((role) => role?.id && isCompatible(role, organization.organizationType))
+      const roles = rolesFromAssignments(row.roles)
+        .filter((role) => isCompatible(role, organization.organizationType))
         .map(({ id, code, name }) => ({ id, code, name }));
       return [
         {
@@ -582,9 +602,8 @@ async function listOrganizations(userId: string, userStatus: string, url: URL) {
     }>(organization);
     const membership = membershipByOrg.get(mapped.id);
     const roles = membership
-      ? ((membership.roles as Array<{ role: JsonMap | null }> | null) ?? [])
-          .map((entry) => camelize<RoleRef>(entry.role))
-          .filter((role) => role?.id && isCompatible(role, mapped.organizationType))
+      ? rolesFromAssignments(membership.roles)
+          .filter((role) => isCompatible(role, mapped.organizationType))
           .map(({ id, code, name }) => ({ id, code, name }))
       : [];
     return {
@@ -742,8 +761,8 @@ async function listMembers(access: OrgAccess, includeRemoved: boolean) {
       createdAt: string;
       updatedAt: string;
       user: JsonMap;
-      roles: Array<{ createdAt: string; role: RoleRef }>;
     }>(member);
+    const assignments = Array.isArray(member.roles) ? member.roles : [];
     return {
       id: mapped.id,
       organizationId: mapped.organizationId,
@@ -755,14 +774,21 @@ async function listMembers(access: OrgAccess, includeRemoved: boolean) {
       invitedAt: mapped.invitedAt,
       createdAt: mapped.createdAt,
       updatedAt: mapped.updatedAt,
-      roles: (mapped.roles ?? [])
-        .filter((entry) => isCompatible(entry.role, access.organization.organizationType))
-        .map((entry) => ({
-          id: entry.role.id,
-          code: entry.role.code,
-          name: entry.role.name,
-          assignedAt: entry.createdAt,
-        })),
+      roles: assignments
+        .map((entry) => {
+          const row = asObject(entry);
+          const role = roleFromRelation(row?.role);
+          if (!role || !isCompatible(role, access.organization.organizationType)) {
+            return null;
+          }
+          return {
+            id: role.id,
+            code: role.code,
+            name: role.name,
+            assignedAt: (row?.created_at as string | undefined) ?? mapped.createdAt,
+          };
+        })
+        .filter((role): role is { id: string; code: string; name: string; assignedAt: string } => Boolean(role)),
     };
   });
 }
@@ -794,8 +820,10 @@ async function listPendingInvitations(access: OrgAccess) {
   }
   return (data ?? []).map((row) => {
     const mapped = camelize<JsonMap>(row);
+    const role = roleFromRelation(row.role);
     return {
       ...mapped,
+      role: role ? { id: role.id, code: role.code, name: role.name } : null,
       invitedBy: row.invited_by ? inviters.get(String(row.invited_by)) ?? null : null,
     };
   });

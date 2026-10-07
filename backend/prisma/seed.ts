@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 
 import { assignGlobalRole, DEMO_PASSWORD, DEMO_USERS, seedDemoOrganizations, seedRbac, upsertUser } from './seed-data.js';
+import { seedDemoMarketplaceProfiles, seedTaxonomy } from './seed-marketplace.js';
 
 const prisma = new PrismaClient();
 
@@ -59,9 +60,10 @@ async function upsertSupabaseAuthUser(
 async function main() {
   await seedRbac(prisma);
 
-  const { email, firstName, lastName } = DEMO_USERS.superAdmin;
   const superAdminUser = await upsertUser(prisma, DEMO_USERS.superAdmin);
-  await upsertSupabaseAuthUser(email, DEMO_PASSWORD, firstName, lastName);
+  for (const user of Object.values(DEMO_USERS)) {
+    await upsertSupabaseAuthUser(user.email, DEMO_PASSWORD, user.firstName, user.lastName);
+  }
 
   await assignGlobalRole(prisma, superAdminUser.id, 'SUPER_ADMIN');
   const alice = await prisma.user.findUnique({ where: { email: 'alice+test@example.com' } });
@@ -69,9 +71,13 @@ async function main() {
     await assignGlobalRole(prisma, alice.id, 'USER');
   }
 
+  await seedTaxonomy(prisma);
+  console.log('Marketplace taxonomy seeded');
+
   if (process.env.SEED_DEMO_ORGANIZATIONS !== 'false') {
     await seedDemoOrganizations(prisma);
-    console.log('Demo organizations seeded (set SEED_DEMO_ORGANIZATIONS=false to skip)');
+    await seedDemoMarketplaceProfiles(prisma);
+    console.log('Demo organizations, provider and professional profiles seeded (set SEED_DEMO_ORGANIZATIONS=false to skip)');
   }
 
   console.log('RBAC seed completed successfully');

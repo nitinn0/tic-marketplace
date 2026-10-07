@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+export { isUniqueViolation } from '../../common/utils/prisma-errors.js';
+
 /**
  * Serializes concurrent ownership/membership changes for one organization. Used before any
  * "last active owner" check so two parallel removals cannot both pass the check.
@@ -29,8 +31,4 @@ export function emptyToNull<T extends string | null | undefined>(value: T): T | 
     return undefined as T;
   }
   return value === '' ? null : value;
-}
-
-export function isUniqueViolation(error: unknown) {
-  return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
 }

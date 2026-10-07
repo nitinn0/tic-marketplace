@@ -13,6 +13,9 @@ import { RbacModule } from './modules/rbac/rbac.module.js';
 import { AuditModule } from './common/audit/audit.module.js';
 import { MailModule } from './common/mail/mail.module.js';
 import { OrganizationsModule } from './modules/organizations/organizations.module.js';
+import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
+import { ProvidersModule } from './modules/providers/providers.module.js';
+import { ProfessionalsModule } from './modules/professionals/professionals.module.js';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
     UsersModule,
     RbacModule,
     OrganizationsModule,
+    TaxonomyModule,
+    ProvidersModule,
+    ProfessionalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

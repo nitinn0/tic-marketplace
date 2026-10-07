@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 
 import { assignGlobalRole, DEMO_USERS, seedDemoOrganizations, seedRbac, upsertUser } from '../../prisma/seed-data.js';
+import { seedDemoMarketplaceProfiles, seedTaxonomy } from '../../prisma/seed-marketplace.js';
 import { assertSafeTestDatabase, TEST_DATABASE_URL } from './test-env.js';
 
 async function ensureDatabaseExists(url: string) {
@@ -39,6 +40,8 @@ export default async function setup() {
     const admin = await upsertUser(prisma, { email: 'admin@example.com', firstName: 'Ada', lastName: 'Admin' });
     await assignGlobalRole(prisma, admin.id, 'ADMIN');
     await seedDemoOrganizations(prisma);
+    await seedTaxonomy(prisma);
+    await seedDemoMarketplaceProfiles(prisma);
   } finally {
     await prisma.$disconnect();
   }

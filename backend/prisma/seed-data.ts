@@ -21,6 +21,8 @@ export const DEMO_USERS = {
   rahul: { email: 'rahul@example.com', firstName: 'Rahul', lastName: 'Sharma' },
   priya: { email: 'priya@example.com', firstName: 'Priya', lastName: 'Nair' },
   ananya: { email: 'ananya@example.com', firstName: 'Ananya', lastName: 'Iyer' },
+  meera: { email: 'meera@example.com', firstName: 'Meera', lastName: 'Kapoor' },
+  arjun: { email: 'arjun@example.com', firstName: 'Arjun', lastName: 'Mehta' },
 } as const;
 
 export const DEMO_ORGANIZATIONS = {
@@ -239,7 +241,151 @@ export async function seedRbac(prisma: PrismaClient) {
     await upsertRolePermission(role.id, orgMemberRoles.id, viewerLevel.id, VIEW_ONLY);
   }
 
-  return { superAdminRole, adminRole, userRole, buyerAdmin, buyerUser, providerAdmin, providerUser };
+  // ---- Phase 4: marketplace taxonomy, provider profiles, professional profiles ----
+  const marketplaceModule = await upsertModule('marketplace', 'Marketplace', 4);
+  const providersModule = await upsertModule('providers', 'Providers', 5);
+  const professionalsModule = await upsertModule('professionals', 'Professionals', 6);
+
+  const marketplaceServices = await upsertSubModule(marketplaceModule.id, 'marketplace_services', 'Services', 1);
+  const marketplaceStandards = await upsertSubModule(marketplaceModule.id, 'marketplace_standards', 'Standards', 2);
+  const marketplaceIndustries = await upsertSubModule(marketplaceModule.id, 'marketplace_industries', 'Industries', 3);
+  const marketplaceLocations = await upsertSubModule(marketplaceModule.id, 'marketplace_locations', 'Locations', 4);
+
+  const taxonomyCategories = await upsertFunctionality(
+    marketplaceServices.id,
+    'marketplace.categories',
+    'Service Categories',
+    'edit',
+    1,
+    'View, create, edit and deactivate the service category hierarchy.',
+  );
+  const taxonomyServices = await upsertFunctionality(
+    marketplaceServices.id,
+    'marketplace.services',
+    'Services',
+    'edit',
+    2,
+    'View, create, edit and deactivate marketplace services.',
+  );
+  const taxonomyStandards = await upsertFunctionality(
+    marketplaceStandards.id,
+    'marketplace.standards',
+    'Standards',
+    'edit',
+    1,
+    'View, create, edit and deactivate standards.',
+  );
+  const taxonomyIndustries = await upsertFunctionality(
+    marketplaceIndustries.id,
+    'marketplace.industries',
+    'Industries',
+    'edit',
+    1,
+    'View and manage the industry hierarchy.',
+  );
+  const taxonomyLocations = await upsertFunctionality(
+    marketplaceLocations.id,
+    'marketplace.locations',
+    'Locations',
+    'edit',
+    1,
+    'View and manage locations.',
+  );
+  const taxonomyFunctionalities = [taxonomyCategories, taxonomyServices, taxonomyStandards, taxonomyIndustries, taxonomyLocations];
+
+  const providerProfileSub = await upsertSubModule(providersModule.id, 'provider_profile', 'Profile', 1);
+  const providerServicesSub = await upsertSubModule(providersModule.id, 'provider_services', 'Services', 2);
+  const providerStandardsSub = await upsertSubModule(providersModule.id, 'provider_standards', 'Standards', 3);
+  const providerIndustriesSub = await upsertSubModule(providersModule.id, 'provider_industries', 'Industries', 4);
+  const providerLocationsSub = await upsertSubModule(providersModule.id, 'provider_locations', 'Locations', 5);
+
+  const providerProfile = await upsertFunctionality(
+    providerProfileSub.id,
+    'providers.profile',
+    'Provider Profile',
+    'edit',
+    1,
+    'View, create and edit the provider profile of a PROVIDER organization.',
+  );
+  const providerServices = await upsertFunctionality(
+    providerServicesSub.id,
+    'providers.services',
+    'Provider Services',
+    'edit',
+    1,
+    'View and manage the services a provider offers.',
+  );
+  const providerStandards = await upsertFunctionality(
+    providerStandardsSub.id,
+    'providers.standards',
+    'Provider Standards',
+    'edit',
+    1,
+    'View and manage the standards a provider declares (not accreditation).',
+  );
+  const providerIndustries = await upsertFunctionality(
+    providerIndustriesSub.id,
+    'providers.industries',
+    'Provider Industries',
+    'edit',
+    1,
+    'View and manage the industries a provider serves.',
+  );
+  const providerLocations = await upsertFunctionality(
+    providerLocationsSub.id,
+    'providers.locations',
+    'Provider Locations',
+    'edit',
+    1,
+    'View and manage provider location coverage.',
+  );
+  const providerCapabilityFunctionalities = [providerServices, providerStandards, providerIndustries, providerLocations];
+
+  const professionalProfileSub = await upsertSubModule(professionalsModule.id, 'professional_profile', 'Profile', 1);
+  const professionalExperienceSub = await upsertSubModule(professionalsModule.id, 'professional_experience', 'Experience', 2);
+
+  const professionalProfile = await upsertFunctionality(
+    professionalProfileSub.id,
+    'professionals.profile',
+    'Professional Profile',
+    'edit',
+    1,
+    'View, create and edit one’s own professional profile.',
+  );
+  const professionalExperience = await upsertFunctionality(
+    professionalExperienceSub.id,
+    'professionals.experience',
+    'Professional Experience',
+    'edit',
+    1,
+    'View and manage one’s own professional experience.',
+  );
+
+  const professionalRole = await prisma.role.findUniqueOrThrow({ where: { code: 'PROFESSIONAL' } });
+
+  const MANAGE: Flags = { canView: true, canCreate: true, canEdit: true, canDelete: true, canConfigure: false };
+  const VIEW_CREATE_EDIT: Flags = { canView: true, canCreate: true, canEdit: true, canDelete: false, canConfigure: false };
+
+  // Taxonomy master data: platform roles only. Provider roles never receive these.
+  for (const functionality of taxonomyFunctionalities) {
+    await upsertRolePermission(superAdminRole.id, functionality.id, adminLevel.id, FULL);
+    await upsertRolePermission(adminRole.id, functionality.id, editorLevel.id, VIEW_CREATE_EDIT);
+  }
+
+  // Provider profiles: SUPER_ADMIN reaches them through organizations.platform_access; ADMIN does not.
+  for (const functionality of [providerProfile, ...providerCapabilityFunctionalities]) {
+    await upsertRolePermission(superAdminRole.id, functionality.id, adminLevel.id, FULL);
+    await upsertRolePermission(providerUser.id, functionality.id, viewerLevel.id, VIEW_ONLY);
+  }
+  await upsertRolePermission(providerAdmin.id, providerProfile.id, adminLevel.id, VIEW_CREATE_EDIT);
+  for (const functionality of providerCapabilityFunctionalities) {
+    await upsertRolePermission(providerAdmin.id, functionality.id, adminLevel.id, MANAGE);
+  }
+
+  await upsertRolePermission(professionalRole.id, professionalProfile.id, viewerLevel.id, VIEW_CREATE_EDIT);
+  await upsertRolePermission(professionalRole.id, professionalExperience.id, viewerLevel.id, MANAGE);
+
+  return { superAdminRole, adminRole, userRole, buyerAdmin, buyerUser, providerAdmin, providerUser, professionalRole };
 }
 
 export async function upsertUser(

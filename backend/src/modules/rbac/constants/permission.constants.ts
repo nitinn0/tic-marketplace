@@ -41,3 +41,30 @@ export const ORGANIZATION_FUNCTIONALITIES = {
    */
   platformAccess: 'organizations.platform_access',
 } as const;
+
+/** Marketplace master data (taxonomy). Granted through global roles only. */
+export const MARKETPLACE_FUNCTIONALITIES = {
+  categories: 'marketplace.categories',
+  services: 'marketplace.services',
+  standards: 'marketplace.standards',
+  industries: 'marketplace.industries',
+  locations: 'marketplace.locations',
+} as const;
+
+/**
+ * Provider profile and capabilities. Evaluated inside the provider organization
+ * (organization roles), or through global roles with platform access.
+ */
+export const PROVIDER_FUNCTIONALITIES = {
+  profile: 'providers.profile',
+  services: 'providers.services',
+  standards: 'providers.standards',
+  industries: 'providers.industries',
+  locations: 'providers.locations',
+} as const;
+
+/** Professional profile (user-level). Evaluated against the caller's global roles. */
+export const PROFESSIONAL_FUNCTIONALITIES = {
+  profile: 'professionals.profile',
+  experience: 'professionals.experience',
+} as const;

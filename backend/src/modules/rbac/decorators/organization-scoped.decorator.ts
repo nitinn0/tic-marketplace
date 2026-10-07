@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext, InternalServerErrorException, SetMetadata } from '@nestjs/common';
+import type { OrganizationType } from '@prisma/client';
 
 import type { OrganizationAccessContext } from '../services/organization-access.service.js';
 
@@ -15,6 +16,11 @@ export type OrganizationScopeOptions = {
   allowHeader?: boolean;
   /** Require an ACTIVE membership; platform-level access is not sufficient. */
   requireMembership?: boolean;
+  /**
+   * Restrict the route to these organization types. Checked after membership and before the
+   * permission, so e.g. buyer organizations are rejected even if a role grants the permission.
+   */
+  organizationTypes?: OrganizationType[];
 };
 
 /**

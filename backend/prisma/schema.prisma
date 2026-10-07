@@ -34,6 +34,7 @@ model User {
   organizationMemberships OrganizationUser[]
   sentInvitations         OrganizationInvitation[] @relation("InvitationInvitedBy")
   acceptedInvitations     OrganizationInvitation[] @relation("InvitationAcceptedBy")
+  professionalProfile     ProfessionalProfile?
 
   @@index([email])
   @@index([status])
@@ -293,9 +294,10 @@ model Organization {
   createdAt          DateTime                       @default(now()) @map("created_at")
   updatedAt          DateTime                       @updatedAt @map("updated_at")
 
-  members     OrganizationUser[]
-  invitations OrganizationInvitation[]
-  auditLogs   AuditLog[]
+  members         OrganizationUser[]
+  invitations     OrganizationInvitation[]
+  auditLogs       AuditLog[]
+  providerProfile ProviderProfile?
 
   @@index([organizationType])
   @@index([status])
@@ -366,4 +368,278 @@ model OrganizationInvitation {
   @@index([email, status])
   @@index([expiresAt])
   @@map("organization_invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: marketplace taxonomy (master data managed by platform admins)
+// ---------------------------------------------------------------------------
+
+/// Service line a category belongs to. Child categories always share their root's type.
+enum ServiceCategoryType {
+  CERTIFICATION
+  TESTING
+  INSPECTION
+  CONSULTING
+  OTHER
+}
+
+model ServiceCategory {
+  id           String              @id @default(uuid()) @db.Uuid
+  parentId     String?             @map("parent_id") @db.Uuid
+  name         String
+  slug         String              @unique
+  description  String?
+  categoryType ServiceCategoryType @map("category_type")
+  active       Boolean             @default(true)
+  sortOrder    Int                 @default(0) @map("sort_order")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  parent   ServiceCategory?  @relation("ServiceCategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children ServiceCategory[] @relation("ServiceCategoryHierarchy")
+  services Service[]
+
+  @@index([parentId, sortOrder])
+  @@index([active])
+  @@map("service_categories")
+}
+
+model Service {
+  id          String   @id @default(uuid()) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category  ServiceCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  providers ProviderService[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId, sortOrder])
+  @@index([active])
+  @@map("services")
+}
+
+model Standard {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  version     String?
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  providers ProviderStandard[]
+
+  @@index([active])
+  @@map("standards")
+}
+
+model Industry {
+  id          String   @id @default(uuid()) @db.Uuid
+  parentId    String?  @map("parent_id") @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  parent    Industry?          @relation("IndustryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Industry[]         @relation("IndustryHierarchy")
+  providers ProviderIndustry[]
+
+  @@index([parentId, sortOrder])
+  @@index([active])
+  @@map("industries")
+}
+
+/// A country (state/city empty), a state (city empty) or a city.
+model Location {
+  id          String   @id @default(uuid()) @db.Uuid
+  countryCode String   @map("country_code") @db.Char(2)
+  state       String?
+  city        String?
+  postalCode  String?  @map("postal_code")
+  latitude    Float?
+  longitude   Float?
+  /// Normalized country|state|city|postal tuple. A plain composite unique index would not
+  /// catch duplicates because PostgreSQL treats NULLs as distinct.
+  locationKey String   @unique @map("location_key")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  providers ProviderLocation[]
+
+  @@index([countryCode, state, city])
+  @@index([active])
+  @@map("locations")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: provider and professional profiles
+// ---------------------------------------------------------------------------
+
+enum ProviderType {
+  CERTIFICATION_BODY
+  TESTING_LAB
+  INSPECTION_COMPANY
+  CONSULTANCY
+  OTHER
+}
+
+enum ProfessionalType {
+  CONSULTANT
+  LEAD_AUDITOR
+  LEAD_VERIFIER
+  INSPECTOR
+  TECHNICAL_EXPERT
+  OTHER
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  PARTIALLY_AVAILABLE
+  UNAVAILABLE
+}
+
+/// Set only by the verification workflow (Phase 5); profiles always start as PENDING.
+enum ProfileVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CoverageType {
+  LOCAL
+  REGIONAL
+  NATIONAL
+  INTERNATIONAL
+}
+
+/// Only organizations with organization_type = PROVIDER may own a provider profile (enforced in the API).
+model ProviderProfile {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  organizationId     String                    @unique @map("organization_id") @db.Uuid
+  providerType       ProviderType              @map("provider_type")
+  headline           String?
+  description        String?
+  yearsInBusiness    Int?                      @map("years_in_business")
+  verificationStatus ProfileVerificationStatus @default(PENDING) @map("verification_status")
+  verifiedAt         DateTime?                 @map("verified_at")
+  publicProfile      Boolean                   @default(false) @map("public_profile")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  services     ProviderService[]
+  standards    ProviderStandard[]
+  industries   ProviderIndustry[]
+  locations    ProviderLocation[]
+
+  @@index([providerType])
+  @@index([verificationStatus])
+  @@index([publicProfile])
+  @@map("provider_profiles")
+}
+
+model ProviderService {
+  providerId String   @map("provider_id") @db.Uuid
+  serviceId  String   @map("service_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@id([providerId, serviceId])
+  @@index([serviceId])
+  @@map("provider_services")
+}
+
+/// A declared/supported standard. This is NOT an accreditation claim (Phase 5).
+model ProviderStandard {
+  providerId String   @map("provider_id") @db.Uuid
+  standardId String   @map("standard_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  standard Standard        @relation(fields: [standardId], references: [id], onDelete: Restrict)
+
+  @@id([providerId, standardId])
+  @@index([standardId])
+  @@map("provider_standards")
+}
+
+model ProviderIndustry {
+  providerId String   @map("provider_id") @db.Uuid
+  industryId String   @map("industry_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  industry Industry        @relation(fields: [industryId], references: [id], onDelete: Restrict)
+
+  @@id([providerId, industryId])
+  @@index([industryId])
+  @@map("provider_industries")
+}
+
+model ProviderLocation {
+  providerId   String        @map("provider_id") @db.Uuid
+  locationId   String        @map("location_id") @db.Uuid
+  coverageType CoverageType? @map("coverage_type")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  location Location        @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@id([providerId, locationId])
+  @@index([locationId])
+  @@map("provider_locations")
+}
+
+/// A professional is an individual user; no organization is required.
+model ProfessionalProfile {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  userId             String                    @unique @map("user_id") @db.Uuid
+  professionalType   ProfessionalType          @map("professional_type")
+  headline           String?
+  bio                String?
+  yearsExperience    Int?                      @map("years_experience")
+  availabilityStatus AvailabilityStatus        @default(AVAILABLE) @map("availability_status")
+  verificationStatus ProfileVerificationStatus @default(PENDING) @map("verification_status")
+  publicProfile      Boolean                   @default(false) @map("public_profile")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+
+  user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experience ProfessionalExperience[]
+
+  @@index([professionalType])
+  @@index([verificationStatus])
+  @@index([publicProfile])
+  @@map("professional_profiles")
+}
+
+model ProfessionalExperience {
+  id               String    @id @default(uuid()) @db.Uuid
+  professionalId   String    @map("professional_id") @db.Uuid
+  organizationName String    @map("organization_name")
+  jobTitle         String    @map("job_title")
+  startDate        DateTime  @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  description      String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, startDate])
+  @@map("professional_experience")
 }

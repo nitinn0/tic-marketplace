@@ -65,6 +65,13 @@ export class PermissionGuard implements CanActivate {
         requireMembership: scope.requireMembership,
       });
 
+      const allowedTypes = scope.organizationTypes;
+      if (allowedTypes?.length && !allowedTypes.includes(organizationContext.organization.organizationType)) {
+        throw new ForbiddenException(
+          `This feature is only available to ${allowedTypes.join(' or ')} organizations`,
+        );
+      }
+
       if (required) {
         this.organizationAccess.assertCan(organizationContext, required.functionality, required.action);
       }

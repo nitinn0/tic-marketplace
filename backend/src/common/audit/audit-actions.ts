@@ -13,6 +13,18 @@ export const AUDIT_ACTIONS = {
   roleAssigned: 'ORGANIZATION_ROLE_ASSIGNED',
   roleRemoved: 'ORGANIZATION_ROLE_REMOVED',
   ownershipTransferred: 'ORGANIZATION_OWNERSHIP_TRANSFERRED',
+  taxonomyCreated: 'TAXONOMY_ITEM_CREATED',
+  taxonomyUpdated: 'TAXONOMY_ITEM_UPDATED',
+  taxonomyDeleted: 'TAXONOMY_ITEM_DELETED',
+  taxonomyDeactivated: 'TAXONOMY_ITEM_DEACTIVATED',
+  providerProfileCreated: 'PROVIDER_PROFILE_CREATED',
+  providerProfileUpdated: 'PROVIDER_PROFILE_UPDATED',
+  providerCapabilitiesChanged: 'PROVIDER_CAPABILITIES_CHANGED',
+  professionalProfileCreated: 'PROFESSIONAL_PROFILE_CREATED',
+  professionalProfileUpdated: 'PROFESSIONAL_PROFILE_UPDATED',
+  professionalExperienceCreated: 'PROFESSIONAL_EXPERIENCE_CREATED',
+  professionalExperienceUpdated: 'PROFESSIONAL_EXPERIENCE_UPDATED',
+  professionalExperienceDeleted: 'PROFESSIONAL_EXPERIENCE_DELETED',
 } as const;
 
 export const AUDIT_ENTITIES = {
@@ -20,4 +32,12 @@ export const AUDIT_ENTITIES = {
   organizationMember: 'organization_user',
   organizationMemberRole: 'organization_user_role',
   organizationInvitation: 'organization_invitation',
+  serviceCategory: 'service_category',
+  service: 'service',
+  standard: 'standard',
+  industry: 'industry',
+  location: 'location',
+  providerProfile: 'provider_profile',
+  professionalProfile: 'professional_profile',
+  professionalExperience: 'professional_experience',
 } as const;

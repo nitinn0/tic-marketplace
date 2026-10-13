@@ -222,7 +222,7 @@ export async function seedDemoMarketplaceProfiles(prisma: PrismaClient) {
   if (xyz) {
     const profile = await prisma.providerProfile.upsert({
       where: { organizationId: xyz.id },
-      update: {},
+      update: { publicProfile: true, verificationStatus: 'VERIFIED', verifiedAt: new Date() },
       create: {
         organizationId: xyz.id,
         providerType: 'TESTING_LAB',
@@ -230,6 +230,8 @@ export async function seedDemoMarketplaceProfiles(prisma: PrismaClient) {
         description: 'Chemical and microbiological testing of drinking, process and waste water.',
         yearsInBusiness: 12,
         publicProfile: true,
+        verificationStatus: 'VERIFIED',
+        verifiedAt: new Date(),
       },
     });
 

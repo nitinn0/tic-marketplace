@@ -16,6 +16,8 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
 import { ProvidersModule } from './modules/providers/providers.module.js';
 import { ProfessionalsModule } from './modules/professionals/professionals.module.js';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module.js';
+import { RfqModule } from './modules/rfq/rfq.module.js';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { ProfessionalsModule } from './modules/professionals/professionals.modul
     TaxonomyModule,
     ProvidersModule,
     ProfessionalsModule,
+    MarketplaceModule,
+    RfqModule,
   ],
   controllers: [AppController],
   providers: [AppService],

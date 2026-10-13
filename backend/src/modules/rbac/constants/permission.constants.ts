@@ -63,6 +63,15 @@ export const PROVIDER_FUNCTIONALITIES = {
   locations: 'providers.locations',
 } as const;
 
+/**
+ * RFQ flow. Buyer permissions are evaluated inside a BUYER organization.
+ * Provider permissions are evaluated inside a PROVIDER organization.
+ */
+export const RFQ_FUNCTIONALITIES = {
+  buyer: 'rfqs.buyer',
+  provider: 'rfqs.provider',
+} as const;
+
 /** Professional profile (user-level). Evaluated against the caller's global roles. */
 export const PROFESSIONAL_FUNCTIONALITIES = {
   profile: 'professionals.profile',

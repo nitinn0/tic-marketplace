@@ -29,6 +29,7 @@ async function bootstrap() {
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ||
         /^https:\/\/.*\.onrender\.com$/.test(origin) ||
         /^https:\/\/.*\.vercel\.app$/.test(origin)
       ) {

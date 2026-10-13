@@ -35,6 +35,8 @@ model User {
   sentInvitations         OrganizationInvitation[] @relation("InvitationInvitedBy")
   acceptedInvitations     OrganizationInvitation[] @relation("InvitationAcceptedBy")
   professionalProfile     ProfessionalProfile?
+  createdRfqs             Rfq[]                    @relation("RfqCreatedBy")
+  submittedQuotes         RfqQuote[]               @relation("QuoteSubmittedBy")
 
   @@index([email])
   @@index([status])
@@ -298,6 +300,7 @@ model Organization {
   invitations     OrganizationInvitation[]
   auditLogs       AuditLog[]
   providerProfile ProviderProfile?
+  rfqs            Rfq[]
 
   @@index([organizationType])
   @@index([status])
@@ -417,6 +420,7 @@ model Service {
 
   category  ServiceCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   providers ProviderService[]
+  rfqs      Rfq[]
 
   @@unique([categoryId, name])
   @@index([categoryId, sortOrder])
@@ -538,11 +542,13 @@ model ProviderProfile {
   createdAt          DateTime                  @default(now()) @map("created_at")
   updatedAt          DateTime                  @updatedAt @map("updated_at")
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  services     ProviderService[]
-  standards    ProviderStandard[]
-  industries   ProviderIndustry[]
-  locations    ProviderLocation[]
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  services      ProviderService[]
+  standards     ProviderStandard[]
+  industries    ProviderIndustry[]
+  locations     ProviderLocation[]
+  rfqDispatches RfqDispatch[]
+  rfqQuotes     RfqQuote[]
 
   @@index([providerType])
   @@index([verificationStatus])
@@ -642,4 +648,86 @@ model ProfessionalExperience {
 
   @@index([professionalId, startDate])
   @@map("professional_experience")
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace RFQ: buyer request, ranked dispatch, quotes back to the buyer.
+// Provider responses are masked in the service layer (company, email, people).
+// ---------------------------------------------------------------------------
+
+enum RfqStatus {
+  OPEN
+  CLOSED
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  WITHDRAWN
+}
+
+model Rfq {
+  id                   String    @id @default(uuid()) @db.Uuid
+  buyerOrganizationId  String    @map("buyer_organization_id") @db.Uuid
+  createdByUserId      String    @map("created_by_user_id") @db.Uuid
+  serviceId            String    @map("service_id") @db.Uuid
+  title                String
+  description          String
+  locationLabel        String    @map("location_label")
+  siteCount            Int       @map("site_count")
+  employeeCount        Int       @map("employee_count")
+  timeline             String?
+  status               RfqStatus @default(OPEN)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  buyerOrganization Organization @relation(fields: [buyerOrganizationId], references: [id], onDelete: Cascade)
+  createdBy         User         @relation("RfqCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  service           Service      @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  dispatches        RfqDispatch[]
+  quotes            RfqQuote[]
+
+  @@index([buyerOrganizationId, createdAt])
+  @@index([serviceId])
+  @@index([status])
+  @@map("rfqs")
+}
+
+/// A provider selected by sorting and analysis. One row per provider per RFQ.
+model RfqDispatch {
+  id           String   @id @default(uuid()) @db.Uuid
+  rfqId        String   @map("rfq_id") @db.Uuid
+  providerId   String   @map("provider_id") @db.Uuid
+  matchScore   Int      @map("match_score")
+  matchReasons Json     @map("match_reasons")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  rfq      Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([rfqId, providerId])
+  @@index([providerId, createdAt])
+  @@map("rfq_dispatches")
+}
+
+model RfqQuote {
+  id                String      @id @default(uuid()) @db.Uuid
+  rfqId             String      @map("rfq_id") @db.Uuid
+  providerId        String      @map("provider_id") @db.Uuid
+  submittedByUserId String      @map("submitted_by_user_id") @db.Uuid
+  amount            Int
+  currency          String      @default("INR")
+  scopeNotes        String      @map("scope_notes")
+  exclusions        String?
+  timelineDays      Int?        @map("timeline_days")
+  status            QuoteStatus @default(SUBMITTED)
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  rfq         Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  provider    ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  submittedBy User            @relation("QuoteSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([rfqId, providerId])
+  @@index([providerId])
+  @@map("rfq_quotes")
 }

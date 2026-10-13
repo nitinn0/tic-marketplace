@@ -33,6 +33,11 @@ export function MarketplaceNavLinks() {
           Provider profile
         </Link>
       ) : null}
+      {canViewProvider ? (
+        <Link href={routes.providerRfqs} className={linkClass}>
+          Incoming RFQs
+        </Link>
+      ) : null}
       {canViewProfessional ? (
         <Link href={routes.professionalProfile} className={linkClass}>
           My expert profile

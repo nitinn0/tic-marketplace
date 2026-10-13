@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 import { appName, routes } from "@/lib/constants";
-import { Button } from "@/components/ui/button";
 import { OrganizationSwitcher } from "@/features/organizations/components/organization-switcher";
 
+import { AccountMenu } from "./account-menu";
 import { MarketplaceNavLinks } from "./marketplace-nav-links";
 
 export function Header() {
@@ -23,8 +23,14 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-slate-700 md:flex">
-          <Link href={routes.home} className="transition hover:text-sky-700">
-            Platform
+          <Link href={routes.services} className="transition hover:text-sky-700">
+            Services
+          </Link>
+          <Link href={routes.providers} className="transition hover:text-sky-700">
+            Providers
+          </Link>
+          <Link href={routes.rfqNew} className="transition hover:text-sky-700">
+            Request quote
           </Link>
           <Link href={routes.dashboard} className="transition hover:text-sky-700">
             Dashboard
@@ -33,19 +39,11 @@ export function Header() {
             Organizations
           </Link>
           <MarketplaceNavLinks />
-          <Link href={routes.adminRbac} className="transition hover:text-sky-700">
-            RBAC
-          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <OrganizationSwitcher />
-          <Button variant="secondary" size="sm" type="button">
-            For buyers
-          </Button>
-          <Button size="sm" type="button" asChild>
-            <Link href={routes.login}>Sign in</Link>
-          </Button>
+          <AccountMenu />
         </div>
       </div>
     </header>

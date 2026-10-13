@@ -1,0 +1,128 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Field, Input, Textarea } from "@/components/ui/input";
+import { api } from "@/lib/api";
+import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
+
+export default function ProviderRfqsPage() {
+  const [rfqs, setRfqs] = useState<ProviderRfq[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  const [scopeNotes, setScopeNotes] = useState("");
+  const [exclusions, setExclusions] = useState("");
+  const [timelineDays, setTimelineDays] = useState("");
+  const [pending, setPending] = useState(false);
+
+  function load() {
+    return api
+      .get<{ rfqs: ProviderRfq[] }>("/provider/rfqs")
+      .then((data) => setRfqs(data.rfqs))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not load RFQs"));
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!activeId) return;
+    setPending(true);
+    setError(null);
+    try {
+      await api.post(`/provider/rfqs/${activeId}/quotes`, {
+        amount: Number(amount),
+        scopeNotes,
+        exclusions: exclusions.trim() || undefined,
+        timelineDays: timelineDays ? Number(timelineDays) : undefined,
+      });
+      setActiveId(null);
+      setAmount("");
+      setScopeNotes("");
+      setExclusions("");
+      setTimelineDays("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the quote");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      <h1 className="font-display text-3xl font-bold">Incoming RFQs</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Buyer company name, email and personal details are masked. You can see location, sites and employee count.
+      </p>
+      {error ? <p className="mt-6 text-sm text-red-700">{error}</p> : null}
+      <ul className="mt-6 space-y-4">
+        {rfqs.map((rfq) => (
+          <li key={rfq.id} className="rounded-xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">{rfq.service.name}</p>
+                <h2 className="mt-1 font-semibold">{rfq.title}</h2>
+              </div>
+              <span className="rounded-full bg-surface px-2 py-1 text-xs text-muted-foreground">Buyer hidden</span>
+            </div>
+            <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-muted-foreground">Location</dt>
+                <dd>{rfq.location}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Sites</dt>
+                <dd>{rfq.siteCount}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Employees</dt>
+                <dd>{rfq.employeeCount}</dd>
+              </div>
+            </dl>
+            <p className="mt-4 text-sm leading-6">{rfq.description}</p>
+            {rfq.timeline ? <p className="mt-2 text-xs text-muted-foreground">Timeline: {rfq.timeline}</p> : null}
+            <p className="mt-2 text-xs text-muted-foreground">{rfq.matchReasons.join(" · ")}</p>
+            {rfq.quote ? (
+              <p className="mt-4 text-sm font-medium">
+                Your quote: {formatMoney(rfq.quote.amount, rfq.quote.currency)}
+              </p>
+            ) : null}
+            {activeId === rfq.id ? (
+              <form onSubmit={onSubmit} className="mt-4 space-y-3 border-t border-border pt-4">
+                <Field label="Amount (INR)" htmlFor={`amount-${rfq.id}`}>
+                  <Input id={`amount-${rfq.id}`} required type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} />
+                </Field>
+                <Field label="Scope" htmlFor={`scope-${rfq.id}`}>
+                  <Textarea id={`scope-${rfq.id}`} required minLength={5} value={scopeNotes} onChange={(event) => setScopeNotes(event.target.value)} />
+                </Field>
+                <Field label="Exclusions" htmlFor={`exclusions-${rfq.id}`}>
+                  <Textarea id={`exclusions-${rfq.id}`} value={exclusions} onChange={(event) => setExclusions(event.target.value)} />
+                </Field>
+                <Field label="Timeline (days)" htmlFor={`days-${rfq.id}`}>
+                  <Input id={`days-${rfq.id}`} type="number" min={1} value={timelineDays} onChange={(event) => setTimelineDays(event.target.value)} />
+                </Field>
+                <Button type="submit" disabled={pending}>
+                  {pending ? "Sending…" : "Send quote"}
+                </Button>
+              </form>
+            ) : (
+              <Button type="button" variant="secondary" className="mt-4" onClick={() => setActiveId(rfq.id)}>
+                {rfq.quote ? "Update quote" : "Quote this RFQ"}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!error && rfqs.length === 0 ? (
+        <p className="mt-6 text-sm text-muted-foreground">
+          No RFQs have been routed to this provider yet. Switch to the provider organization that offers the service.
+        </p>
+      ) : null}
+    </div>
+  );
+}

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { getStoredSession, clearSession } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { ActiveOrganizationCard } from "@/features/organizations/components/active-organization-card";
 
 function StatCard({ title, value, tone = "default" }: { title: string; value: string; tone?: "default" | "success" | "warning" }) {
@@ -70,6 +70,11 @@ export default function DashboardPage() {
         const payload = await api.get<MeResponse>("/auth/me");
         setMe(payload);
       } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          clearSession();
+          window.location.href = "/login?next=/dashboard";
+          return;
+        }
         setError(err instanceof Error ? err.message : "Unable to load dashboard.");
       } finally {
         setLoading(false);

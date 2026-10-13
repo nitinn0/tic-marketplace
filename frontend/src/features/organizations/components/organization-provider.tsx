@@ -3,7 +3,8 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
-import { getActiveOrganizationId, setActiveOrganizationId } from "@/lib/api";
+import { ApiError, getActiveOrganizationId, setActiveOrganizationId } from "@/lib/api";
+import { clearSession } from "@/lib/auth";
 
 import { organizationsService } from "../services/organizations.service";
 import type { MeResponse, OrganizationContext, UserOrganization } from "../types";
@@ -84,6 +85,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       setStatus("ready");
     } catch (err) {
       if (current !== requestId.current) return;
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        setMe(null);
+        setActiveId(null);
+        setActiveContext(null);
+        setError(null);
+        setStatus("anonymous");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Unable to load your organizations.");
       setStatus("error");
     }

@@ -29,10 +29,10 @@ export function Footer() {
             Services
           </h3> 
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Testing</li>
-            <li>Inspection</li>
-            <li>Certification</li>
-            <li>Sustainability</li>
+            <li><Link href={routes.services}>Testing</Link></li>
+            <li><Link href={`${routes.services}?category=inspection`}>Inspection</Link></li>
+            <li><Link href={`${routes.services}?category=certification`}>Certification</Link></li>
+            <li><Link href={`${routes.services}?category=experts-consulting`}>Consulting</Link></li>
           </ul>
         </div>
 

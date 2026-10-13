@@ -58,13 +58,22 @@ export function AccountMenu() {
   const signedIn = Boolean(user);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="flex items-center gap-2">
+      {/* {signedIn ? null : (
+        <Link
+          href={routes.login}
+          className="inline-flex items-center rounded-full bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800"
+        >
+          Login
+        </Link>
+      )} */}
+      <div ref={rootRef} className="relative">
       <button
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-200"
+        className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-200"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">
           <User className="h-4 w-4" />
@@ -95,9 +104,18 @@ export function AccountMenu() {
             ) : (
               <>
                 <span>New Customer?</span>
-                <Link href={routes.register} className="font-semibold text-red-600 hover:text-red-700" onClick={() => setOpen(false)}>
-                  Sign-Up
-                </Link>
+                <span className="flex items-center gap-3">
+                  <Link
+                    href={routes.login}
+                    className="rounded-full border border-sky-700 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                    onClick={() => setOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link href={routes.register} className="font-semibold text-red-600 hover:text-red-700" onClick={() => setOpen(false)}>
+                    Sign-Up
+                  </Link>
+                </span>
               </>
             )}
           </div>
@@ -115,6 +133,7 @@ export function AccountMenu() {
           ))}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

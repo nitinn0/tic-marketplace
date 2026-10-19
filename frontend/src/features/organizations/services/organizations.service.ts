@@ -23,7 +23,7 @@ const member = (organizationId: string, memberId: string) =>
 export const organizationsService = {
   me: () => api.get<MeResponse>("/auth/me"),
 
-  list: () => api.get<OrganizationSummary[]>("/organizations"),
+  list: (scope?: "all") => api.get<OrganizationSummary[]>(scope === "all" ? "/organizations?scope=all" : "/organizations"),
   get: (organizationId: string) => api.get<OrganizationDetails>(base(organizationId)),
   create: (input: CreateOrganizationInput) => api.post<OrganizationDetails>("/organizations", input),
   update: (organizationId: string, input: UpdateOrganizationInput) =>

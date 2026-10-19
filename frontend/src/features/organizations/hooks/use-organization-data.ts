@@ -3,8 +3,8 @@
 import { organizationsService } from "../services/organizations.service";
 import { useApiResource } from "./use-api-resource";
 
-export function useOrganizationList() {
-  return useApiResource(() => organizationsService.list(), []);
+export function useOrganizationList(scope: "all" | "mine" | null) {
+  return useApiResource(scope ? () => organizationsService.list(scope === "all" ? "all" : undefined) : null, [scope]);
 }
 
 export function useOrganizationDetails(organizationId: string) {

@@ -1,3 +1,4 @@
+import { handlePrivateCatalog, handlePublicCatalog } from "@/lib/server/catalog-api";
 import { getMeOrganizations, handleOrganizationsApi, OrganizationsApiError } from "@/lib/server/organizations-api";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 
@@ -315,6 +316,9 @@ export async function handleAppApi(request: Request, path: string) {
       return json({ status: "ok", service: "tic-marketplace-api" });
     }
 
+    const publicCatalog = await handlePublicCatalog(request, path);
+    if (publicCatalog) return publicCatalog;
+
     const authUser = await requireUser(request);
 
     if (method === "GET" && path === "auth/me") {
@@ -326,6 +330,12 @@ export async function handleAppApi(request: Request, path: string) {
     if (organizationsResponse) {
       return organizationsResponse;
     }
+
+    const privateCatalog = await handlePrivateCatalog(request, path, {
+      id: String(appUser.id),
+      status: String(appUser.status ?? ""),
+    });
+    if (privateCatalog) return privateCatalog;
 
     if (method === "GET" && path === "rbac/modules") {
       return json(await listModules());

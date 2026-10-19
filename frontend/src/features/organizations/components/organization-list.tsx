@@ -44,8 +44,10 @@ export function OrganizationList({
                   <span className="text-slate-500">Your roles: </span>
                   {organization.membership.roles.map((role) => role.name).join(", ")}
                 </p>
-              ) : (
+              ) : organization.membership ? (
                 <p className="text-slate-500">No organization roles assigned.</p>
+              ) : (
+                <p className="text-slate-500">Opened with platform access.</p>
               )}
             </div>
 

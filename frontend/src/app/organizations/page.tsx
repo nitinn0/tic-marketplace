@@ -14,11 +14,16 @@ import { CreateOrganizationForm } from "@/features/organizations/components/crea
 import { OrganizationList } from "@/features/organizations/components/organization-list";
 import { useOrganizationList } from "@/features/organizations/hooks/use-organization-data";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
+import { hasPermission, ORGANIZATION_FUNCTIONALITIES } from "@/features/organizations/utils/permissions";
 
 export default function OrganizationsPage() {
   const router = useRouter();
-  const { data, error, loading } = useOrganizationList();
-  const { activeOrganization, refresh } = useOrganizations();
+  const { activeOrganization, refresh, me, status } = useOrganizations();
+  const platformAccess =
+    status === "ready" &&
+    hasPermission(me?.permissions, "organizations.platform_access", "view") &&
+    hasPermission(me?.permissions, ORGANIZATION_FUNCTIONALITIES.profile, "view");
+  const { data, error, loading } = useOrganizationList(status === "loading" ? null : platformAccess ? "all" : "mine");
   const [creating, setCreating] = useState(false);
 
   return (
@@ -28,8 +33,9 @@ export default function OrganizationsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Workspace</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900">Organizations</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Organizations you are an active member of. Access inside each organization comes from the roles you hold
-            there.
+            {platformAccess
+              ? "Every organization on the platform. Open one to manage it with your platform access."
+              : "Organizations you are an active member of. Access inside each organization comes from the roles you hold there."}
           </p>
         </div>
         {!creating ? (
@@ -53,7 +59,7 @@ export default function OrganizationsPage() {
       ) : null}
 
       <div className="mt-8">
-        {loading ? (
+        {status === "loading" || loading ? (
           <LoadingState label="Loading organizations..." />
         ) : error ? (
           <ErrorState title="Unable to load organizations" description={error} />
@@ -61,8 +67,12 @@ export default function OrganizationsPage() {
           <OrganizationList organizations={data} activeOrganizationId={activeOrganization?.id ?? null} />
         ) : (
           <EmptyState
-            title="You are not part of any organization yet"
-            description="Create an organization or accept an invitation to get started. Independent professionals do not need one."
+            title={platformAccess ? "No organizations yet" : "You are not part of any organization yet"}
+            description={
+              platformAccess
+                ? "Create an organization to get started."
+                : "Create an organization or accept an invitation to get started. Independent professionals do not need one."
+            }
           />
         )}
       </div>

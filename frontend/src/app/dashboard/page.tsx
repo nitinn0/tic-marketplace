@@ -95,8 +95,12 @@ export default function DashboardPage() {
     void load();
   }, [status, activeOrganization?.id]);
 
-  const roles = activeContext?.roles ?? activeOrganization?.roles ?? [];
-  const permissions = activeContext?.permissions ?? [];
+  const roles =
+    (activeContext?.roles.length ? activeContext.roles : null) ??
+    (activeOrganization?.roles.length ? activeOrganization.roles : null) ??
+    me?.globalRoles ??
+    [];
+  const permissions = activeContext?.permissions.length ? activeContext.permissions : (me?.permissions ?? []);
   const openRfqs = rfqs.filter((rfq) => rfq.status === "OPEN");
   const quoteCount = rfqs.reduce((total, rfq) => total + rfq.quotes.length, 0);
 
@@ -163,7 +167,13 @@ export default function DashboardPage() {
             <StatCard
               title="Your role"
               value={roles.map((role) => role.name).join(", ") || "Member"}
-              hint={activeOrganization ? `${activeOrganization.organizationType === "BUYER" ? "Buyer" : "Provider"} at ${activeOrganization.displayName}` : "No organization selected"}
+              hint={
+                activeOrganization
+                  ? `${activeOrganization.organizationType === "BUYER" ? "Buyer" : "Provider"} at ${activeOrganization.displayName}`
+                  : roles.length
+                    ? "Platform role"
+                    : "No organization selected"
+              }
             />
           </div>
 

@@ -8,6 +8,7 @@ export type MarketplaceService = {
   categoryType: string;
   categoryPath: string[];
   providerCount: number;
+  postedBy: { id: string; name: string } | null;
 };
 
 export type MarketplaceProvider = {

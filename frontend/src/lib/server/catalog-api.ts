@@ -293,7 +293,19 @@ async function loadCatalog() {
   return { index, services, providers, industries };
 }
 
-function serviceCard(service: CatalogService, index: ReturnType<typeof buildTree>, providerCount: number) {
+function postedByFor(serviceId: string, providers: CatalogProvider[]) {
+  const match = providers
+    .filter((provider) => provider.services.some((service) => service.id === serviceId))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  return match ? { id: match.id, name: match.name } : null;
+}
+
+function serviceCard(
+  service: CatalogService,
+  index: ReturnType<typeof buildTree>,
+  providerCount: number,
+  postedBy: { id: string; name: string } | null,
+) {
   const path = ancestorsOf(index, service.categoryId).map((node) => node.name);
   return {
     id: service.id,
@@ -305,6 +317,7 @@ function serviceCard(service: CatalogService, index: ReturnType<typeof buildTree
     categoryType: service.categoryType,
     categoryPath: [...path, service.categoryName].filter(Boolean),
     providerCount,
+    postedBy,
   };
 }
 
@@ -357,7 +370,9 @@ async function marketplaceHome() {
         return (ancestors[0]?.id ?? service.categoryId) === root.id;
       }).length,
     })),
-    popular: popular.map((service) => serviceCard(service, catalog.index, providerCountFor(service.id, catalog.providers))),
+    popular: popular.map((service) =>
+      serviceCard(service, catalog.index, providerCountFor(service.id, catalog.providers), postedByFor(service.id, catalog.providers)),
+    ),
     providers: catalog.providers.slice(0, 6).map(providerCard),
     industries: catalog.industries,
   };
@@ -386,7 +401,9 @@ async function marketplaceServices(url: URL) {
     return keywords.every((word) => haystack.includes(word));
   });
   return {
-    services: filtered.map((service) => serviceCard(service, catalog.index, providerCountFor(service.id, catalog.providers))),
+    services: filtered.map((service) =>
+      serviceCard(service, catalog.index, providerCountFor(service.id, catalog.providers), postedByFor(service.id, catalog.providers)),
+    ),
     category: category ? { slug: category.slug, name: category.name } : null,
   };
 }
@@ -397,7 +414,7 @@ async function marketplaceService(slug: string) {
   if (!service) throw new CatalogError("Service not found", 404);
   const offering = catalog.providers.filter((provider) => provider.services.some((row) => row.id === service.id));
   return {
-    ...serviceCard(service, catalog.index, offering.length),
+    ...serviceCard(service, catalog.index, offering.length, postedByFor(service.id, offering)),
     description: service.description,
     providers: offering.map(providerCard),
   };

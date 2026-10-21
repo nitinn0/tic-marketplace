@@ -1,11 +1,25 @@
 import { CoverageType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateNested } from 'class-validator';
 
 import { TrimUpper } from '../../../common/dto/transforms.js';
 
 const MAX_ITEMS = 200;
 const DUPLICATES = 'must not contain duplicate entries';
+
+export class PublishProviderServiceDto {
+  @IsUUID()
+  categoryId: string;
+
+  @IsString()
+  @Length(2, 160)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+}
 
 export class ReplaceProviderServicesDto {
   @IsArray()

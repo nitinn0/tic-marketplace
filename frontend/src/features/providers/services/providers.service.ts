@@ -25,8 +25,12 @@ export const providersService = {
     api.patch<ProviderProfile>("/provider/profile", input, scoped(organizationId)),
   catalog: (organizationId: string) => api.get<ProviderCatalog>("/provider/catalog", scoped(organizationId)),
 
+  publishService: (organizationId: string, input: { categoryId: string; name: string; description?: string }) =>
+    api.post<ProviderServiceItem[]>("/provider/profile/services/publish", input, scoped(organizationId)),
   replaceServices: (organizationId: string, serviceIds: string[]) =>
     api.put<ProviderServiceItem[]>("/provider/profile/services", { serviceIds }, scoped(organizationId)),
+  removeService: (organizationId: string, serviceId: string) =>
+    api.delete<ProviderServiceItem[]>(`/provider/profile/services/${serviceId}`, scoped(organizationId)),
   replaceStandards: (organizationId: string, standardIds: string[]) =>
     api.put<ProviderStandardItem[]>("/provider/profile/standards", { standardIds }, scoped(organizationId)),
   replaceIndustries: (organizationId: string, industryIds: string[]) =>

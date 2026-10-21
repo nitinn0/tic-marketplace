@@ -14,7 +14,8 @@ export function ServiceCard({ s }: { s: MarketplaceService }) {
         {s.description || "Accredited providers can quote this service."}
       </p>
       <p className="mt-4 text-xs text-muted-foreground">
-        {s.providerCount} {s.providerCount === 1 ? "provider" : "providers"}
+        {s.postedBy ? `Posted by ${s.postedBy.name}` : `${s.providerCount} ${s.providerCount === 1 ? "provider" : "providers"}`}
+        {s.postedBy && s.providerCount > 1 ? ` · ${s.providerCount} providers` : ""}
       </p>
     </Link>
   );

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import { ProviderBasicForm } from "@/features/providers/components/provider-basic-form";
+import { ProviderServicesPanel } from "@/features/providers/components/provider-services-panel";
 import { providersService } from "@/features/providers/services/providers.service";
 import type { ProviderProfile } from "@/features/providers/types";
 import { profileVerificationLabels, profileVerificationTones, providerTypeLabels } from "@/features/providers/utils/labels";
@@ -52,7 +53,7 @@ export default function ProviderDashboardPage() {
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [missingProfile, setMissingProfile] = useState(false);
   const [rfqs, setRfqs] = useState<ProviderRfq[]>([]);
-  const [panel, setPanel] = useState<"overview" | "rfqs">("overview");
+  const [panel, setPanel] = useState<"overview" | "services" | "rfqs">("overview");
   const [rfqFilter, setRfqFilter] = useState<RfqGroup | "ALL">("ALL");
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -162,12 +163,31 @@ export default function ProviderDashboardPage() {
             </button>
             <button
               type="button"
+              onClick={() => setPanel("services")}
+              className={`border-b-2 px-1 pb-3 text-sm font-medium ${panel === "services" ? "border-sky-700 text-sky-800" : "border-transparent text-slate-600 hover:text-sky-700"}`}
+            >
+              Services
+            </button>
+            <button
+              type="button"
               onClick={() => setPanel("rfqs")}
               className={`border-b-2 px-1 pb-3 text-sm font-medium ${panel === "rfqs" ? "border-sky-700 text-sky-800" : "border-transparent text-slate-600 hover:text-sky-700"}`}
             >
               All RFQ&apos;s
             </button>
           </div>
+
+          {panel === "services" && organizationId ? (
+            <ProviderServicesPanel
+              organizationId={organizationId}
+              profile={profile}
+              onChanged={async () => {
+                const saved = await providersService.getProfile(organizationId);
+                setProfile(saved);
+                setMissingProfile(false);
+              }}
+            />
+          ) : null}
 
           {panel === "rfqs" ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -276,8 +296,8 @@ export default function ProviderDashboardPage() {
                   </span>
                 </li>
               </ul>
-              <Button asChild variant="secondary" className="mt-6">
-                <Link href={routes.providerProfile}>Edit services and locations</Link>
+              <Button type="button" variant="secondary" className="mt-6" onClick={() => setPanel("services")}>
+                Post a service
               </Button>
             </section>
           </div>

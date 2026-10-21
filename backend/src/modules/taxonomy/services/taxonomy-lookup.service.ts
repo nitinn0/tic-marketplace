@@ -118,6 +118,15 @@ export class TaxonomyLookupService {
     const categoryOrder = new Map(orderDepthFirst(categoryIndex).map(({ node }, position) => [node.id, position]));
 
     return {
+      categories: orderDepthFirst(categoryIndex)
+        .filter(({ node }) => isEffectivelyActive(categoryIndex, node.id))
+        .map(({ node, depth }) => ({
+          id: node.id,
+          name: node.name,
+          slug: node.slug,
+          depth,
+          path: this.categoryPath(categoryIndex, node.id),
+        })),
       services: services
         .filter((service) => isEffectivelyActive(categoryIndex, service.categoryId))
         .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0))

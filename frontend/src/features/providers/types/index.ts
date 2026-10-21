@@ -82,6 +82,7 @@ export type ProviderProfileInput = {
 };
 
 export type ProviderCatalog = {
+  categories: Array<{ id: string; name: string; slug: string; depth: number; path: string[] }>;
   services: Array<{
     id: string;
     name: string;

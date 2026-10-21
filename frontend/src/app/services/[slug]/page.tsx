@@ -54,6 +54,11 @@ export default function ServiceDetailPage() {
       <p className="mt-4 max-w-3xl text-muted-foreground">
         {service.description || "Send one RFQ and matched providers will quote this service."}
       </p>
+      {service.postedBy ? (
+        <p className="mt-3 text-sm text-slate-700">
+          Posted by <span className="font-medium">{service.postedBy.name}</span>
+        </p>
+      ) : null}
       <h2 className="mt-12 font-display text-2xl font-bold">Providers for this service</h2>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {service.providers.map((provider) => (

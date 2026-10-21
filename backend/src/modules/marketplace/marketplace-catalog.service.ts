@@ -28,7 +28,7 @@ const CATEGORY_TAGLINE: Record<string, string> = {
 type CategoryRow = ServiceCategory;
 type ServiceRow = Service & {
   category: ServiceCategory;
-  providers: { providerId: string }[];
+  providers: { provider: { id: string; organization: { displayName: string } } }[];
 };
 
 type PublicProvider = ProviderProfile & {
@@ -158,6 +158,9 @@ export class MarketplaceCatalogService {
       categoryType: service.category.categoryType,
       categoryPath: [...path, service.category.name],
       providerCount: service.providers.length,
+      postedBy: service.providers[0]
+        ? { id: service.providers[0].provider.id, name: service.providers[0].provider.organization.displayName }
+        : null,
     };
   }
 
@@ -187,7 +190,8 @@ export class MarketplaceCatalogService {
         category: true,
         providers: {
           where: { provider: PUBLIC_PROVIDER_PROFILE_WHERE },
-          select: { providerId: true },
+          orderBy: { createdAt: 'asc' },
+          select: { provider: { select: { id: true, organization: { select: { displayName: true } } } } },
         },
       },
     });

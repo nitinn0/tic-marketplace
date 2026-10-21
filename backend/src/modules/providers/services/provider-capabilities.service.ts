@@ -10,6 +10,7 @@ import {
   toLocationSummary,
   type TaxonomyReferenceKind,
 } from '../../taxonomy/services/taxonomy-lookup.service.js';
+import { slugify } from '../../taxonomy/utils/slug.util.js';
 import { ancestorsOf, isEffectivelyActive } from '../../taxonomy/utils/tree.util.js';
 
 export type CapabilityKind = TaxonomyReferenceKind;
@@ -101,6 +102,43 @@ export class ProviderCapabilitiesService {
     });
 
     return this.list(providerId, kind);
+  }
+
+  /** Creates a catalogue service when needed, lists this provider on it, and makes the profile public. */
+  async publish(
+    organizationId: string,
+    actorId: string,
+    input: { categoryId: string; name: string; description?: string | null },
+  ) {
+    const providerId = await this.requireProfileId(organizationId);
+    const index = await this.lookup.categoryIndex();
+    if (!isEffectivelyActive(index, input.categoryId)) {
+      throw new BadRequestException('Choose an active category');
+    }
+
+    const name = input.name.trim().replace(/\s+/g, ' ');
+    const description = input.description?.trim() || null;
+    const existing = await this.prisma.service.findFirst({
+      where: { categoryId: input.categoryId, name: { equals: name, mode: 'insensitive' } },
+    });
+    const serviceId = existing
+      ? existing.id
+      : await this.createCatalogueService(actorId, input.categoryId, name, description);
+
+    if (existing && !existing.active) {
+      throw new BadRequestException('This service exists but is inactive');
+    }
+    if (
+      await this.prisma.providerService.findUnique({
+        where: { providerId_serviceId: { providerId, serviceId } },
+      })
+    ) {
+      throw new ConflictException('This service is already posted on your profile');
+    }
+
+    await this.add(organizationId, actorId, 'services', { id: serviceId });
+    await this.prisma.providerProfile.update({ where: { id: providerId }, data: { publicProfile: true } });
+    return this.listServices(providerId);
   }
 
   async add(organizationId: string, actorId: string, kind: CapabilityKind, entry: CapabilityEntry) {
@@ -221,6 +259,31 @@ export class ProviderCapabilitiesService {
         assignedAt: createdAt,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  private async createCatalogueService(actorId: string, categoryId: string, name: string, description: string | null) {
+    const base = slugify(name);
+    if (!base) throw new BadRequestException('Enter a name that can be used in the service URL');
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const slug = attempt === 0 ? base : `${base.slice(0, 110)}-${attempt + 1}`.replace(/-+$/g, '');
+      try {
+        const service = await this.prisma.service.create({
+          data: { categoryId, name, slug, description, active: true },
+        });
+        await this.audit.log({
+          action: AUDIT_ACTIONS.taxonomyCreated,
+          entityType: AUDIT_ENTITIES.service,
+          entityId: service.id,
+          actorUserId: actorId,
+          metadata: { name, slug, categoryId, postedByOrganization: true },
+        });
+        return service.id;
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+      }
+    }
+    throw new ConflictException('A service with this name could not be created');
   }
 
   private async assertAssignable(kind: CapabilityKind, ids: string[]) {

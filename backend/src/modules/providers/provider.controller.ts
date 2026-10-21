@@ -24,6 +24,7 @@ import { TaxonomyLookupService } from '../taxonomy/services/taxonomy-lookup.serv
 import {
   AddProviderIndustryDto,
   AddProviderServiceDto,
+  PublishProviderServiceDto,
   AddProviderStandardDto,
   ProviderLocationInputDto,
   ReplaceProviderIndustriesDto,
@@ -97,6 +98,17 @@ export class ProviderController {
     @Body() dto: ReplaceProviderServicesDto,
   ) {
     return this.capabilities.replace(context.organization.id, user.sub, 'services', dto.serviceIds.map((id) => ({ id })));
+  }
+
+  @Post('profile/services/publish')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermission(P.services, 'edit')
+  publishService(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: PublishProviderServiceDto,
+  ) {
+    return this.capabilities.publish(context.organization.id, user.sub, dto);
   }
 
   @Post('profile/services')

@@ -7,9 +7,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { organizationsService } from "@/features/organizations/services/organizations.service";
-import { api, setActiveOrganizationId } from "@/lib/api";
-import { getStoredSession, saveSession } from "@/lib/auth";
+import { ApiError, api, setActiveOrganizationId, usesSupabaseAuth } from "@/lib/api";
+import { clearSession, getStoredSession, saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
+import { sessionFromSupabaseAuth, signUpWithEmail, supabaseTokenIsValid } from "@/lib/supabase-auth";
 
 type RegisterResponse = {
   accessToken: string;
@@ -55,23 +56,48 @@ export default function JoinPage() {
     router.refresh();
   }
 
+  async function ensureSession() {
+    const stored = getStoredSession();
+    if (usesSupabaseAuth()) {
+      const valid = stored ? await supabaseTokenIsValid(stored.accessToken) : false;
+      if (valid) return;
+      if (!email.trim() || !password) {
+        clearSession();
+        setSignedIn(false);
+        throw new Error("Enter your email and password, then create the provider organization again.");
+      }
+      const authData = await signUpWithEmail({ email: email.trim(), password, firstName: firstName.trim(), lastName: lastName.trim() });
+      saveSession(sessionFromSupabaseAuth(authData, { email, firstName, lastName }));
+      setSignedIn(true);
+      return;
+    }
+
+    if (stored) return;
+    const result = await api.post<RegisterResponse>("/auth/register", {
+      firstName,
+      lastName,
+      email,
+      password,
+    });
+    saveSession(result);
+    setSignedIn(true);
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      if (!signedIn) {
-        const result = await api.post<RegisterResponse>("/auth/register", {
-          firstName,
-          lastName,
-          email,
-          password,
-        });
-        saveSession(result);
-      }
+      await ensureSession();
       await createProviderOrganization();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to start provider onboarding.");
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        setSignedIn(false);
+        setError("Your session is not valid for this site. Enter your email and password, then try again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Unable to start provider onboarding.");
+      }
     } finally {
       setLoading(false);
     }

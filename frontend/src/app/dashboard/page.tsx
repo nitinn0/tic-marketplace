@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, FileText, FlaskConical, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { HighlightCarousel, type CarouselSlide } from "@/components/dashboard/highlight-carousel";
-import { clearSession } from "@/lib/auth";
+import { clearSession, isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 import { ActiveOrganizationCard } from "@/features/organizations/components/active-organization-card";
@@ -70,16 +71,23 @@ function serviceImage(service: { name: string; categoryName: string; slug: strin
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { me, status, error: profileError, activeOrganization, activeContext } = useOrganizations();
   const [home, setHome] = useState<MarketplaceHome | null>(null);
   const [rfqs, setRfqs] = useState<BuyerRfq[]>([]);
   const [catalogReady, setCatalogReady] = useState(false);
 
   useEffect(() => {
-    if (status === "anonymous") {
+    if (status === "anonymous" && !isAuthenticated()) {
       window.location.href = "/login?next=/dashboard";
     }
   }, [status]);
+
+  useEffect(() => {
+    if (status === "ready" && activeOrganization?.organizationType === "PROVIDER") {
+      router.replace(routes.providerDashboard);
+    }
+  }, [status, activeOrganization, router]);
 
   useEffect(() => {
     if (status !== "ready") return;

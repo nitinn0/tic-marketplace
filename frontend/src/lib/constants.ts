@@ -12,6 +12,7 @@ export const routes = {
   adminRbac: "/admin/rbac",
   adminTaxonomy: "/admin/taxonomy",
   providerProfile: "/provider/profile",
+  providerDashboard: "/provider/dashboard",
   professionalProfile: "/professional/profile",
   organizations: "/organizations",
   organization: (id: string) => `/organizations/${id}`,

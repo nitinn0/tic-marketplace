@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Briefcase,
   ClipboardList,
+  EllipsisVertical,
   Heart,
   MapPin,
   Package,
@@ -15,6 +17,8 @@ import type { LucideIcon } from "lucide-react";
 
 import { clearSession, getStoredSession, type SessionUser } from "@/lib/auth";
 import { routes } from "@/lib/constants";
+
+import { MarketplaceNavLinks } from "./marketplace-nav-links";
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: routes.dashboard, label: "My Profile", icon: UserRound },
@@ -32,12 +36,15 @@ function destination(href: string, signedIn: boolean) {
 
 export function AccountMenu() {
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     setUser(getStoredSession()?.user ?? null);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,6 +61,22 @@ export function AccountMenu() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreOpen]);
 
   const signedIn = Boolean(user);
 
@@ -72,7 +95,10 @@ export function AccountMenu() {
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setMoreOpen(false);
+          setOpen((current) => !current);
+        }}
         className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-200"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500">
@@ -131,8 +157,39 @@ export function AccountMenu() {
               {label}
             </Link>
           ))}
+          {signedIn ? <MarketplaceNavLinks menu onNavigate={() => setOpen(false)} /> : null}
         </div>
       ) : null}
+      </div>
+      <div ref={moreRef} className="relative">
+        <button
+          type="button"
+          aria-label="More"
+          aria-expanded={moreOpen}
+          aria-haspopup="menu"
+          onClick={() => {
+            setOpen(false);
+            setMoreOpen((current) => !current);
+          }}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+        >
+          <EllipsisVertical className="h-5 w-5" />
+        </button>
+        {moreOpen ? (
+          <div
+            role="menu"
+            className="absolute right-0 z-50 mt-2 w-52 rounded-md border border-slate-200 bg-white py-1 text-slate-800 shadow-lg"
+          >
+            <Link
+              href={routes.join}
+              role="menuitem"
+              onClick={() => setMoreOpen(false)}
+              className="block px-4 py-3 text-sm hover:bg-slate-50"
+            >
+              Join as provider
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
   );

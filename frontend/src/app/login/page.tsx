@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { organizationsService } from "@/features/organizations/services/organizations.service";
 import { api, usesSupabaseAuth } from "@/lib/api";
+import { homeForMemberships, requestedNext } from "@/lib/home-route";
 import { signInWithEmail } from "@/lib/supabase-auth";
 import { routes } from "@/lib/constants";
 
@@ -21,10 +23,14 @@ type LoginResponse = {
   };
 };
 
-/** Only same-origin relative paths are honoured to avoid open redirects. */
-function getRedirectTarget() {
-  const next = new URLSearchParams(window.location.search).get("next");
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : routes.dashboard;
+async function destinationAfterLogin() {
+  const next = requestedNext();
+  if (next) return next;
+  try {
+    return homeForMemberships(await organizationsService.me());
+  } catch {
+    return routes.dashboard;
+  }
 }
 
 export default function LoginPage() {
@@ -59,7 +65,7 @@ export default function LoginPage() {
             status: "ACTIVE",
           }),
         );
-        router.push(getRedirectTarget());
+        router.push(await destinationAfterLogin());
         router.refresh();
         return;
       }
@@ -68,7 +74,7 @@ export default function LoginPage() {
       window.localStorage.setItem("tic_access_token", result.accessToken);
       window.localStorage.setItem("tic_refresh_token", result.refreshToken);
       window.localStorage.setItem("tic_user", JSON.stringify(result.user));
-      router.push(getRedirectTarget());
+      router.push(await destinationAfterLogin());
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");

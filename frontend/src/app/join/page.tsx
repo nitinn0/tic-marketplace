@@ -1,28 +1,157 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
+import { organizationsService } from "@/features/organizations/services/organizations.service";
+import { api, setActiveOrganizationId } from "@/lib/api";
+import { getStoredSession, saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 
+type RegisterResponse = {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number | string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+  };
+};
+
+const loginHref = `${routes.login}?next=${encodeURIComponent(routes.providerProfile)}`;
+
 export default function JoinPage() {
+  const router = useRouter();
+  const [step, setStep] = useState<"choose" | "onboard">("choose");
+  const [signedIn, setSignedIn] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setSignedIn(Boolean(getStoredSession()));
+  }, []);
+
+  async function createProviderOrganization() {
+    const organization = await organizationsService.create({
+      legalName: legalName.trim(),
+      displayName: displayName.trim(),
+      organizationType: "PROVIDER",
+    });
+    setActiveOrganizationId(organization.id);
+    await organizationsService.switch(organization.id);
+    router.push(routes.providerProfile);
+    router.refresh();
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (!signedIn) {
+        const result = await api.post<RegisterResponse>("/auth/register", {
+          firstName,
+          lastName,
+          email,
+          password,
+        });
+        saveSession(result);
+      }
+      await createProviderOrganization();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to start provider onboarding.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
-      <h1 className="font-display text-3xl font-bold">Join as a provider</h1>
-      <p className="mt-4 text-muted-foreground">
-        Labs, inspection companies, certification bodies and consultants list their services and receive RFQs that
-        match. Buyers stay masked: you see location, sites and headcount, not the company name or contact details.
-      </p>
-      <ol className="mt-8 space-y-3 text-sm">
-        <li>1. Create a provider organization and profile.</li>
-        <li>2. Add the services you offer and the locations you cover.</li>
-        <li>3. Make the profile public. Incoming RFQs appear under Incoming RFQs.</li>
-      </ol>
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Button asChild variant="cta">
-          <Link href={routes.login}>Sign in</Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={routes.organizations}>Organizations</Link>
-        </Button>
+    <div className="mx-auto flex min-h-[70vh] max-w-lg items-center px-4 py-12">
+      <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Providers</p>
+        <h1 className="mt-3 text-2xl font-bold text-slate-900">Join as a provider</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          List your lab, inspection company, certification body, or consulting practice and receive matching RFQs.
+        </p>
+
+        {step === "choose" ? (
+          <div className="mt-8 grid gap-3">
+            <Button type="button" className="w-full" onClick={() => setStep("onboard")}>
+              Onboard
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={loginHref}>Login</Link>
+            </Button>
+            <p className="text-center text-sm text-slate-500">
+              New providers start with Onboard. Use Login if you already have an account.
+            </p>
+          </div>
+        ) : (
+          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+            {signedIn ? null : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="First name" htmlFor="firstName">
+                    <Input id="firstName" required minLength={2} value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+                  </Field>
+                  <Field label="Last name" htmlFor="lastName">
+                    <Input id="lastName" required minLength={2} value={lastName} onChange={(event) => setLastName(event.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Email" htmlFor="email">
+                  <Input id="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+                </Field>
+                <Field label="Password" htmlFor="password">
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </Field>
+              </>
+            )}
+            <Field label="Business name" htmlFor="displayName">
+              <Input
+                id="displayName"
+                required
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Name buyers will see"
+              />
+            </Field>
+            <Field label="Legal name" htmlFor="legalName">
+              <Input
+                id="legalName"
+                required
+                value={legalName}
+                onChange={(event) => setLegalName(event.target.value)}
+                placeholder="Registered company name"
+              />
+            </Field>
+            {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating provider..." : "Create provider account"}
+            </Button>
+            <button type="button" className="text-sm font-medium text-slate-600 hover:text-slate-900" onClick={() => setStep("choose")}>
+              Back
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

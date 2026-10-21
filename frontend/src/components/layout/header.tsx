@@ -1,20 +1,20 @@
 import Link from "next/link";
 
+import { SearchBar } from "@/components/site";
 import { appName, routes } from "@/lib/constants";
 import { OrganizationSwitcher } from "@/features/organizations/components/organization-switcher";
 
 import { AccountMenu } from "./account-menu";
-import { MarketplaceNavLinks } from "./marketplace-nav-links";
 
 export function Header() {
   return (
-    <header className="border-b border-slate-200 bg-white/90 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link href={routes.home} className="flex items-center gap-3">
+    <header className="relative z-30 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:gap-6 lg:px-8">
+        <Link href={routes.home} className="flex shrink-0 items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-700 text-sm font-bold text-white">
             TIC
           </div>
-          <div>
+          <div className="hidden sm:block">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
               Marketplace
             </p>
@@ -22,26 +22,11 @@ export function Header() {
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm text-slate-700 md:flex">
-          <Link href={routes.services} className="transition hover:text-sky-700">
-            Services
-          </Link>
-          <Link href={routes.providers} className="transition hover:text-sky-700">
-            Providers
-          </Link>
-          <Link href={routes.rfqNew} className="transition hover:text-sky-700">
-            Request quote
-          </Link>
-          <Link href={routes.dashboard} className="transition hover:text-sky-700">
-            Dashboard
-          </Link>
-          <Link href={routes.organizations} className="transition hover:text-sky-700">
-            Organizations
-          </Link>
-          <MarketplaceNavLinks />
-        </nav>
+        <div className="min-w-0 flex-1">
+          <SearchBar variant="header" />
+        </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <OrganizationSwitcher />
           <AccountMenu />
         </div>

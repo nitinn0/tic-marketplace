@@ -56,7 +56,15 @@ function rememberSearch(term: string) {
   window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
 }
 
-export function SearchBar({ large = false, initial = "" }: { large?: boolean; initial?: string }) {
+export function SearchBar({
+  large = false,
+  initial = "",
+  variant = "default",
+}: {
+  large?: boolean;
+  initial?: string;
+  variant?: "default" | "header";
+}) {
   const router = useRouter();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -138,6 +146,7 @@ export function SearchBar({ large = false, initial = "" }: { large?: boolean; in
   const trending = home?.popular ?? [];
   const visibleTrending = showAllTrending ? trending : trending.slice(0, 6);
   const typed = query.trim().length > 0;
+  const header = variant === "header";
 
   return (
     <div ref={rootRef} className="relative">
@@ -146,6 +155,7 @@ export function SearchBar({ large = false, initial = "" }: { large?: boolean; in
         className={cn(
           "flex items-center gap-2 rounded-full border border-border bg-card p-1.5 shadow-sm",
           large && "p-2 shadow-md",
+          header && "bg-white p-1 shadow-none",
           open && "ring-2 ring-primary/30",
         )}
       >
@@ -158,10 +168,11 @@ export function SearchBar({ large = false, initial = "" }: { large?: boolean; in
           }}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
-          placeholder="Search testing, certification, inspection or ESG"
+          placeholder={header ? "Search services, providers, standards…" : "Search testing, certification, inspection or ESG"}
           className={cn(
             "min-w-0 flex-1 bg-transparent px-2 text-foreground outline-none placeholder:text-muted-foreground",
             large ? "h-11 text-base" : "h-9 text-sm",
+            header && "h-9 text-sm",
           )}
           aria-label="Search services"
           aria-expanded={open}
@@ -169,7 +180,7 @@ export function SearchBar({ large = false, initial = "" }: { large?: boolean; in
           aria-autocomplete="list"
           autoComplete="off"
         />
-        <Button type="submit" className={cn("rounded-full", large && "h-11 px-6")}>
+        <Button type="submit" className={cn("rounded-full", large && "h-11 px-6", header && "h-9 px-4")}>
           Search
         </Button>
       </form>

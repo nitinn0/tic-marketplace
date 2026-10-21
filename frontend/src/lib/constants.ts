@@ -27,6 +27,7 @@ export const routes = {
   rfq: (id: string) => `/rfq/${id}`,
   providerRfqs: "/provider/rfqs",
   join: "/join",
+  howItWorks: "/how-it-works",
 } as const;
 
 export type UserRole = "buyer" | "provider" | "admin";

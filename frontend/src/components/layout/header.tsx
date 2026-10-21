@@ -1,10 +1,10 @@
 import Link from "next/link";
 
-import { SearchBar } from "@/components/site";
 import { appName, routes } from "@/lib/constants";
 import { OrganizationSwitcher } from "@/features/organizations/components/organization-switcher";
 
 import { AccountMenu } from "./account-menu";
+import { HeaderNav } from "./header-nav";
 
 export function Header() {
   return (
@@ -22,9 +22,7 @@ export function Header() {
           </div>
         </Link>
 
-        <div className="min-w-0 flex-1">
-          <SearchBar variant="header" />
-        </div>
+        <HeaderNav />
 
         <div className="flex shrink-0 items-center gap-3">
           <OrganizationSwitcher />

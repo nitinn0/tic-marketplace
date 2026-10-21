@@ -59,6 +59,53 @@ async function readJson(request: Request) {
   }
 }
 
+/** Creates a confirmed Supabase user. No confirmation email or OTP is sent. */
+async function confirmProviderAccount(body: JsonMap) {
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "");
+  const firstName = String(body.firstName ?? "").trim();
+  const lastName = String(body.lastName ?? "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ApiError("A valid email is required");
+  }
+  if (password.length < 8) {
+    throw new ApiError("Password must be at least 8 characters");
+  }
+  if (firstName.length < 2 || lastName.length < 2) {
+    throw new ApiError("First and last name are required");
+  }
+
+  const admin = getSupabaseAdmin();
+  const metadata = { first_name: firstName, last_name: lastName };
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: metadata,
+  });
+  if (!error) return json({ confirmed: true }, 201);
+
+  if (!/already (been )?registered|already exists/i.test(error.message)) {
+    throw new ApiError(error.message, 400);
+  }
+
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  if (linkError || !link.user) {
+    throw new ApiError(linkError?.message ?? "An account with this email already exists", 400);
+  }
+  if (link.user.email_confirmed_at) {
+    return json({ confirmed: true, existing: true });
+  }
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(link.user.id, {
+    email_confirm: true,
+    password,
+    user_metadata: metadata,
+  });
+  if (updateError) throw new ApiError(updateError.message, 400);
+  return json({ confirmed: true }, 201);
+}
+
 async function requireUser(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) {
@@ -318,6 +365,10 @@ export async function handleAppApi(request: Request, path: string) {
 
     const publicCatalog = await handlePublicCatalog(request, path);
     if (publicCatalog) return publicCatalog;
+
+    if (method === "POST" && path === "auth/provider-signup") {
+      return confirmProviderAccount(await readJson(request));
+    }
 
     const authUser = await requireUser(request);
 

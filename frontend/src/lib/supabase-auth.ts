@@ -12,27 +12,18 @@ export async function supabaseTokenIsValid(token: string) {
   return !error && Boolean(data.user);
 }
 
-/** Creates a Supabase user when needed, then returns a session the API will accept. */
+/** Creates a confirmed account on the server, then signs in. Supabase does not send a confirmation email. */
 export async function signUpWithEmail(input: { email: string; password: string; firstName: string; lastName: string }) {
-  const { data, error } = await supabase.auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: { data: { first_name: input.firstName, last_name: input.lastName } },
+  const response = await fetch("/api/v1/auth/provider-signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
-  if (data.session) return data;
-  if (error && !/already registered|already exists/i.test(error.message)) {
-    throw error;
+  const body = (await response.json().catch(() => ({}))) as { message?: string };
+  if (!response.ok) {
+    throw new Error(body.message || "Unable to create the account.");
   }
-
-  try {
-    return await signInWithEmail(input.email, input.password);
-  } catch (signInError) {
-    const message = signInError instanceof Error ? signInError.message : "";
-    if (/confirm/i.test(message)) {
-      throw new Error("Confirm your email, then use Login to finish creating the provider organization.");
-    }
-    throw signInError;
-  }
+  return signInWithEmail(input.email, input.password);
 }
 
 export function sessionFromSupabaseAuth(

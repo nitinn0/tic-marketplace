@@ -13,10 +13,28 @@ import { ProviderBasicForm } from "@/features/providers/components/provider-basi
 import { providersService } from "@/features/providers/services/providers.service";
 import type { ProviderProfile } from "@/features/providers/types";
 import { profileVerificationLabels, profileVerificationTones, providerTypeLabels } from "@/features/providers/utils/labels";
-import type { ProviderRfq } from "@/features/marketplace/types";
+import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
 import { ApiError, api } from "@/lib/api";
 import { clearSession, isAuthenticated } from "@/lib/auth";
 import { routes } from "@/lib/constants";
+
+type RfqGroup = "PENDING" | "ACCEPTED" | string;
+
+function rfqGroup(rfq: ProviderRfq): RfqGroup {
+  if (rfq.quote) return "ACCEPTED";
+  if (!rfq.status || rfq.status === "OPEN") return "PENDING";
+  return rfq.status;
+}
+
+function groupLabel(group: RfqGroup) {
+  if (group === "PENDING") return "Pending";
+  if (group === "ACCEPTED") return "Accepted";
+  return group
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 function StatCard({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
@@ -34,6 +52,8 @@ export default function ProviderDashboardPage() {
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [missingProfile, setMissingProfile] = useState(false);
   const [rfqs, setRfqs] = useState<ProviderRfq[]>([]);
+  const [panel, setPanel] = useState<"overview" | "rfqs">("overview");
+  const [rfqFilter, setRfqFilter] = useState<RfqGroup | "ALL">("ALL");
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -84,6 +104,9 @@ export default function ProviderDashboardPage() {
   }, [status, organizationId]);
 
   const quoted = rfqs.filter((rfq) => rfq.quote);
+  const otherGroups = [...new Set(rfqs.map(rfqGroup).filter((group) => group !== "PENDING" && group !== "ACCEPTED"))];
+  const filters: Array<RfqGroup | "ALL"> = ["ALL", "PENDING", "ACCEPTED", ...(otherGroups.length ? otherGroups : ["CLOSED"])];
+  const visibleRfqs = rfqFilter === "ALL" ? rfqs : rfqs.filter((rfq) => rfqGroup(rfq) === rfqFilter);
   const services = profile?.capabilities.services.length ?? 0;
   const standards = profile?.capabilities.standards.length ?? 0;
   const locations = profile?.capabilities.locations.length ?? 0;
@@ -129,6 +152,69 @@ export default function ProviderDashboardPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-8">
+          <div className="flex gap-6 border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setPanel("overview")}
+              className={`border-b-2 px-1 pb-3 text-sm font-medium ${panel === "overview" ? "border-sky-700 text-sky-800" : "border-transparent text-slate-600 hover:text-sky-700"}`}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanel("rfqs")}
+              className={`border-b-2 px-1 pb-3 text-sm font-medium ${panel === "rfqs" ? "border-sky-700 text-sky-800" : "border-transparent text-slate-600 hover:text-sky-700"}`}
+            >
+              All RFQ&apos;s
+            </button>
+          </div>
+
+          {panel === "rfqs" ? (
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                {filters.map((filter) => {
+                  const count = filter === "ALL" ? rfqs.length : rfqs.filter((rfq) => rfqGroup(rfq) === filter).length;
+                  const selected = rfqFilter === filter;
+                  return (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setRfqFilter(filter)}
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium ${selected ? "bg-sky-700 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                    >
+                      {filter === "ALL" ? "All" : groupLabel(filter)} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+              {visibleRfqs.length === 0 ? (
+                <p className="mt-6 text-sm text-slate-500">No RFQs in this filter.</p>
+              ) : (
+                <ul className="mt-4 divide-y divide-slate-100">
+                  {visibleRfqs.map((rfq) => {
+                    const group = rfqGroup(rfq);
+                    return (
+                      <li key={rfq.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
+                        <span>
+                          <span className="block font-medium text-slate-900">{rfq.title}</span>
+                          <span className="mt-1 block text-sm text-slate-500">
+                            {rfq.service.name} · {rfq.location}
+                            {rfq.quote ? ` · ${formatMoney(rfq.quote.amount, rfq.quote.currency)}` : ""}
+                          </span>
+                        </span>
+                        <Badge tone={group === "ACCEPTED" ? "success" : group === "PENDING" ? "warning" : "neutral"}>
+                          {groupLabel(group)}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
+          {panel === "overview" ? (
+          <>
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard title="Incoming RFQs" value={String(rfqs.length)} hint={`${rfqs.length - quoted.length} waiting for a quote`} />
             <StatCard title="Quotes sent" value={String(quoted.length)} hint="Responses from this organization" />
@@ -201,9 +287,9 @@ export default function ProviderDashboardPage() {
               <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                 <ClipboardList className="h-4 w-4" /> Incoming RFQs
               </p>
-              <Link href={routes.providerRfqs} className="text-sm font-medium text-sky-700">
-                View all
-              </Link>
+              <button type="button" onClick={() => setPanel("rfqs")} className="text-sm font-medium text-sky-700">
+                All RFQ&apos;s
+              </button>
             </div>
             {rfqs.length === 0 ? (
               <p className="mt-6 text-sm text-slate-500">No requests are waiting. Matching RFQs will show up here.</p>
@@ -223,6 +309,8 @@ export default function ProviderDashboardPage() {
               </ul>
             )}
           </section>
+          </>
+          ) : null}
         </div>
       )}
     </Container>

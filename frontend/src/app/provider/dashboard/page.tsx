@@ -145,7 +145,7 @@ export default function ProviderDashboardPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Profile fields</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">{activeOrganization.displayName}</h2>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">{activeOrganization?.displayName}</h2>
                 </div>
                 {profile ? <Badge tone={profileVerificationTones[profile.verificationStatus]}>{profileVerificationLabels[profile.verificationStatus]}</Badge> : null}
               </div>

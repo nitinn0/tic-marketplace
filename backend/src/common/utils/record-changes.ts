@@ -22,7 +22,11 @@ export function diffChanges<T extends Record<string, unknown>>(current: T, next:
   };
 }
 
-function isSameValue(a: unknown, b: unknown) {
+function isSameValue(a: unknown, b: unknown): boolean {
   if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((value, index) => isSameValue(value, b[index]));
+  }
   return a === b;
 }

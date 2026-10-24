@@ -225,7 +225,7 @@ export async function seedDemoMarketplaceProfiles(prisma: PrismaClient) {
       update: { publicProfile: true, verificationStatus: 'VERIFIED', verifiedAt: new Date() },
       create: {
         organizationId: xyz.id,
-        providerType: 'TESTING_LAB',
+        providerTypes: ['TESTING_LAB'],
         headline: 'Environmental and water testing laboratory',
         description: 'Chemical and microbiological testing of drinking, process and waste water.',
         yearsInBusiness: 12,

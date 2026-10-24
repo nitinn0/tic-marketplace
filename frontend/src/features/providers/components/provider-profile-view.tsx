@@ -17,7 +17,7 @@ import { routes } from "@/lib/constants";
 
 import { providersService } from "../services/providers.service";
 import type { ProviderCatalog, ProviderProfile } from "../types";
-import { profileVerificationLabels, profileVerificationTones, providerTypeLabels } from "../utils/labels";
+import { formatProviderTypes, profileVerificationLabels, profileVerificationTones } from "../utils/labels";
 import { CapabilitySection, SectionCard, type CapabilityOption } from "./capability-section";
 import { LocationsSection } from "./locations-section";
 import { ProviderBasicForm } from "./provider-basic-form";
@@ -157,7 +157,7 @@ function ProviderProfileDetails({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge tone="info">{providerTypeLabels[profile.providerType]}</Badge>
+          <Badge tone="info">{formatProviderTypes(profile.providerTypes)}</Badge>
           <Badge tone={profileVerificationTones[profile.verificationStatus]}>
             {profileVerificationLabels[profile.verificationStatus]}
           </Badge>
@@ -200,7 +200,7 @@ function ProviderProfileDetails({
         ) : (
           <dl className="grid gap-x-6 gap-y-3 text-sm md:grid-cols-[12rem_1fr]">
             <dt className="text-slate-500">Provider type</dt>
-            <dd className="text-slate-900">{providerTypeLabels[profile.providerType]}</dd>
+            <dd className="text-slate-900">{formatProviderTypes(profile.providerTypes)}</dd>
             <dt className="text-slate-500">Headline</dt>
             <dd className="text-slate-900">{profile.headline || "—"}</dd>
             <dt className="text-slate-500">Description</dt>

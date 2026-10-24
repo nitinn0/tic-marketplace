@@ -17,6 +17,7 @@ export type MarketplaceProvider = {
   headline: string | null;
   description?: string | null;
   providerType: string;
+  providerTypes: string[];
   verified: boolean;
   yearsInBusiness: number | null;
   services: { slug: string; name: string }[];

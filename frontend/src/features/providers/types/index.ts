@@ -59,7 +59,7 @@ export type ProviderProfile = {
     organizationType: OrganizationType;
     status: OrganizationStatus;
   };
-  providerType: ProviderType;
+  providerTypes: ProviderType[];
   headline: string | null;
   description: string | null;
   yearsInBusiness: number | null;
@@ -74,7 +74,7 @@ export type ProviderProfile = {
 };
 
 export type ProviderProfileInput = {
-  providerType?: ProviderType;
+  providerTypes?: ProviderType[];
   headline?: string | null;
   description?: string | null;
   yearsInBusiness?: number | null;

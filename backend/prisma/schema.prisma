@@ -532,7 +532,7 @@ enum CoverageType {
 model ProviderProfile {
   id                 String                    @id @default(uuid()) @db.Uuid
   organizationId     String                    @unique @map("organization_id") @db.Uuid
-  providerType       ProviderType              @map("provider_type")
+  providerTypes      ProviderType[]            @map("provider_types")
   headline           String?
   description        String?
   yearsInBusiness    Int?                      @map("years_in_business")
@@ -550,7 +550,7 @@ model ProviderProfile {
   rfqDispatches RfqDispatch[]
   rfqQuotes     RfqQuote[]
 
-  @@index([providerType])
+  @@index([providerTypes])
   @@index([verificationStatus])
   @@index([publicProfile])
   @@map("provider_profiles")

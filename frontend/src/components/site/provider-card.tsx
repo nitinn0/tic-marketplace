@@ -25,7 +25,11 @@ export function ProviderCard({ p }: { p: MarketplaceProvider }) {
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{TYPE_LABEL[p.providerType] ?? "Provider"}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {(p.providerTypes?.length ? p.providerTypes : [p.providerType])
+          .map((type) => TYPE_LABEL[type] ?? type)
+          .join(" · ") || "Provider"}
+      </p>
       <p className="mt-3 line-clamp-2 flex-1 text-sm text-muted-foreground">
         {p.headline || "Listed TIC service provider"}
       </p>

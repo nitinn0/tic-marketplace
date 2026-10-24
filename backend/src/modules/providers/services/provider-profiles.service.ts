@@ -48,7 +48,7 @@ export class ProviderProfilesService {
         const profile = await tx.providerProfile.create({
           data: {
             organizationId: organization.id,
-            providerType: dto.providerType,
+            providerTypes: dto.providerTypes,
             headline: optionalText(dto.headline) ?? null,
             description: optionalText(dto.description) ?? null,
             yearsInBusiness: dto.yearsInBusiness ?? null,
@@ -62,7 +62,7 @@ export class ProviderProfilesService {
             entityId: profile.id,
             organizationId: organization.id,
             actorUserId: actorId,
-            metadata: { providerType: profile.providerType, publicProfile: profile.publicProfile },
+            metadata: { providerTypes: profile.providerTypes, publicProfile: profile.publicProfile },
           },
           tx,
         );
@@ -81,7 +81,7 @@ export class ProviderProfilesService {
     if (!current) throw new NotFoundException('Provider profile not found');
 
     const { data, changes, changed } = diffChanges(current, {
-      providerType: dto.providerType,
+      providerTypes: dto.providerTypes,
       headline: optionalText(dto.headline),
       description: optionalText(dto.description),
       yearsInBusiness: dto.yearsInBusiness,
@@ -125,7 +125,7 @@ export class ProviderProfilesService {
 
     return {
       organization: { id: profile.organization.id, displayName: profile.organization.displayName },
-      providerType: profile.providerType,
+      providerTypes: profile.providerTypes,
       headline: profile.headline,
       description: profile.description,
       yearsInBusiness: profile.yearsInBusiness,
@@ -154,7 +154,7 @@ export class ProviderProfilesService {
         organizationType: organization.organizationType,
         status: organization.status,
       },
-      providerType: profile.providerType,
+      providerTypes: profile.providerTypes,
       headline: profile.headline,
       description: profile.description,
       yearsInBusiness: profile.yearsInBusiness,

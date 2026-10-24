@@ -17,6 +17,14 @@ export const Squish = () =>
 export const TrimUpper = () =>
   Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value));
 
+/** Uppercases every string entry in an array (for enum multi-select payloads). */
+export const TrimUpperEach = () =>
+  Transform(({ value }) =>
+    Array.isArray(value)
+      ? value.map((entry) => (typeof entry === 'string' ? entry.trim().toUpperCase() : entry))
+      : value,
+  );
+
 export const TrimLower = () =>
   Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value));
 

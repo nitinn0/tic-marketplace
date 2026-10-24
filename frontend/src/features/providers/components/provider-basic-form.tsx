@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Field, Input, Textarea } from "@/components/ui/input";
 
 import type { ProviderProfile, ProviderProfileInput, ProviderType } from "../types";
 import { PROVIDER_TYPES, providerTypeLabels } from "../utils/labels";
@@ -21,7 +21,7 @@ export function ProviderBasicForm({
   onCancel?: () => void;
 }) {
   const [form, setForm] = useState({
-    providerType: profile?.providerType ?? ("TESTING_LAB" as ProviderType),
+    providerTypes: profile?.providerTypes?.length ? profile.providerTypes : (["TESTING_LAB"] as ProviderType[]),
     headline: profile?.headline ?? "",
     description: profile?.description ?? "",
     yearsInBusiness: profile?.yearsInBusiness?.toString() ?? "",
@@ -33,13 +33,26 @@ export function ProviderBasicForm({
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
+  const toggleType = (type: ProviderType, checked: boolean) => {
+    setForm((current) => {
+      const next = checked
+        ? [...current.providerTypes, type]
+        : current.providerTypes.filter((entry) => entry !== type);
+      return { ...current, providerTypes: PROVIDER_TYPES.filter((entry) => next.includes(entry)) };
+    });
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (form.providerTypes.length === 0) {
+      setError("Select at least one provider type");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await onSubmit({
-        providerType: form.providerType,
+        providerTypes: form.providerTypes,
         headline: form.headline.trim(),
         description: form.description.trim(),
         yearsInBusiness: form.yearsInBusiness.trim() ? Number(form.yearsInBusiness) : null,
@@ -54,14 +67,19 @@ export function ProviderBasicForm({
 
   return (
     <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-      <Field label="Provider type" htmlFor="provider-type">
-        <Select id="provider-type" value={form.providerType} onChange={(event) => update("providerType", event.target.value as ProviderType)}>
+      <Field label="Provider type" htmlFor="provider-type-CERTIFICATION_BODY" className="md:col-span-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
           {PROVIDER_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {providerTypeLabels[type]}
-            </option>
+            <Checkbox
+              key={type}
+              id={`provider-type-${type}`}
+              label={providerTypeLabels[type]}
+              checked={form.providerTypes.includes(type)}
+              onChange={(checked) => toggleType(type, checked)}
+            />
           ))}
-        </Select>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">Select every type that applies to your organization.</p>
       </Field>
       <Field label="Years in business" htmlFor="provider-years">
         <Input

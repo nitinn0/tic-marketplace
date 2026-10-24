@@ -201,6 +201,7 @@ type CatalogProvider = {
   headline: string | null;
   description: string | null;
   providerType: string;
+  providerTypes: string[];
   verified: boolean;
   yearsInBusiness: number | null;
   services: { id: string; slug: string; name: string }[];
@@ -218,7 +219,7 @@ async function loadCatalog() {
     ),
     selectAll(
       "provider_profiles",
-      "id, headline, description, provider_type, years_in_business, verification_status, public_profile, created_at, organization:organizations(display_name, status, organization_type), services:provider_services(service:services(id, name, slug, active)), locations:provider_locations(location:locations(country_code, state, city, postal_code))",
+      "id, headline, description, provider_types, years_in_business, verification_status, public_profile, created_at, organization:organizations(display_name, status, organization_type), services:provider_services(service:services(id, name, slug, active)), locations:provider_locations(location:locations(country_code, state, city, postal_code))",
     ),
     selectAll("industries", "id, name, slug, active, parent_id, sort_order"),
   ]);
@@ -258,7 +259,14 @@ async function loadCatalog() {
         name: String(organization?.display_name ?? "Provider"),
         headline: text(row.headline),
         description: text(row.description),
-        providerType: String(row.provider_type ?? ""),
+        providerTypes: Array.isArray(row.provider_types)
+          ? row.provider_types.map((entry) => String(entry))
+          : row.provider_type
+            ? [String(row.provider_type)]
+            : [],
+        providerType: Array.isArray(row.provider_types)
+          ? String(row.provider_types[0] ?? "")
+          : String(row.provider_type ?? ""),
         verified: row.verification_status === "VERIFIED",
         yearsInBusiness: row.years_in_business == null ? null : Number(row.years_in_business),
         services: serviceLinks.flatMap((link) => {
@@ -327,6 +335,7 @@ function providerCard(provider: CatalogProvider) {
     name: provider.name,
     headline: provider.headline,
     providerType: provider.providerType,
+    providerTypes: provider.providerTypes,
     verified: provider.verified,
     yearsInBusiness: provider.yearsInBusiness,
     services: provider.services.map(({ slug, name }) => ({ slug, name })),

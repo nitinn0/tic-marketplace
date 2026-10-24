@@ -12,6 +12,11 @@ export const providerTypeLabels: Record<ProviderType, string> = {
   OTHER: "Other",
 };
 
+export function formatProviderTypes(types: ProviderType[] | string[] | null | undefined) {
+  if (!types?.length) return "Provider";
+  return types.map((type) => providerTypeLabels[type as ProviderType] ?? type).join(" · ");
+}
+
 export const COVERAGE_TYPES: CoverageType[] = ["LOCAL", "REGIONAL", "NATIONAL", "INTERNATIONAL"];
 
 export const coverageTypeLabels: Record<CoverageType, string> = {

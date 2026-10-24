@@ -73,7 +73,7 @@ describe('Provider profiles (e2e)', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         organizationId: xyzId,
-        providerType: 'TESTING_LAB',
+        providerTypes: ['TESTING_LAB'],
         verificationStatus: 'PENDING',
         verifiedAt: null,
         publicProfile: true,
@@ -110,7 +110,7 @@ describe('Provider profiles (e2e)', () => {
         const response = await as(token, acmeId).get('/provider/profile');
         expect(response.status).toBe(403);
         expect(response.body.message).toMatch(/PROVIDER organizations/);
-        expect((await as(token, acmeId).post('/provider/profile', { providerType: 'OTHER' })).status).toBe(403);
+        expect((await as(token, acmeId).post('/provider/profile', { providerTypes: ['OTHER'] })).status).toBe(403);
       }
       expect(await api.prisma.providerProfile.count({ where: { organizationId: acmeId } })).toBe(0);
     });
@@ -130,12 +130,12 @@ describe('Provider profiles (e2e)', () => {
     });
 
     it('does not let a PROVIDER_USER create the profile', async () => {
-      expect((await as(rahul, abcId).post('/provider/profile', { providerType: 'CERTIFICATION_BODY' })).status).toBe(403);
+      expect((await as(rahul, abcId).post('/provider/profile', { providerTypes: ['CERTIFICATION_BODY'] })).status).toBe(403);
     });
 
     it('rejects client-supplied verification fields', async () => {
       const response = await as(owner.token, freshOrgId).post('/provider/profile', {
-        providerType: 'CERTIFICATION_BODY',
+        providerTypes: ['CERTIFICATION_BODY'],
         verificationStatus: 'VERIFIED',
       });
       expect(response.status).toBe(400);
@@ -143,14 +143,14 @@ describe('Provider profiles (e2e)', () => {
 
     it('creates the profile as PENDING and private by default, then rejects a second one', async () => {
       const created = await as(owner.token, freshOrgId).post('/provider/profile', {
-        providerType: 'certification_body',
+        providerTypes: ['certification_body'],
         headline: '  Accredited   certification body ',
         yearsInBusiness: 8,
       });
       expect(created.status).toBe(201);
       expect(created.body).toMatchObject({
         organizationId: freshOrgId,
-        providerType: 'CERTIFICATION_BODY',
+        providerTypes: ['CERTIFICATION_BODY'],
         headline: 'Accredited certification body',
         yearsInBusiness: 8,
         verificationStatus: 'PENDING',
@@ -160,7 +160,7 @@ describe('Provider profiles (e2e)', () => {
         capabilities: { services: [], standards: [], industries: [], locations: [] },
       });
 
-      expect((await as(owner.token, freshOrgId).post('/provider/profile', { providerType: 'OTHER' })).status).toBe(409);
+      expect((await as(owner.token, freshOrgId).post('/provider/profile', { providerTypes: ['OTHER'] })).status).toBe(409);
       const audit = await api.prisma.auditLog.findFirst({ where: { action: 'PROVIDER_PROFILE_CREATED', organizationId: freshOrgId } });
       expect(audit?.actorUserId).toBe(owner.id);
     });
@@ -175,8 +175,8 @@ describe('Provider profiles (e2e)', () => {
       expect(updated.body).toMatchObject({ publicProfile: true, publiclyVisible: true, headline: null, verificationStatus: 'PENDING' });
 
       const invalid = await Promise.all([
-        as(owner.token, freshOrgId).patch('/provider/profile', { providerType: null }),
-        as(owner.token, freshOrgId).patch('/provider/profile', { providerType: 'SCHOOL' }),
+        as(owner.token, freshOrgId).patch('/provider/profile', { providerTypes: null }),
+        as(owner.token, freshOrgId).patch('/provider/profile', { providerTypes: ['SCHOOL'] }),
         as(owner.token, freshOrgId).patch('/provider/profile', { yearsInBusiness: -1 }),
         as(owner.token, freshOrgId).patch('/provider/profile', { verifiedAt: new Date().toISOString() }),
         as(owner.token, freshOrgId).patch('/provider/profile', { organizationId: xyzId }),
@@ -200,7 +200,7 @@ describe('Provider profiles (e2e)', () => {
     beforeAll(async () => {
       const abcProfile = await api.prisma.providerProfile.findUnique({ where: { organizationId: abcId } });
       if (!abcProfile) {
-        const created = await as(john, abcId).post('/provider/profile', { providerType: 'CERTIFICATION_BODY' });
+        const created = await as(john, abcId).post('/provider/profile', { providerTypes: ['CERTIFICATION_BODY'] });
         expect(created.status).toBe(201);
       }
     });

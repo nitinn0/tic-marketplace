@@ -13,7 +13,7 @@ import { ProviderBasicForm } from "@/features/providers/components/provider-basi
 import { ProviderServicesPanel } from "@/features/providers/components/provider-services-panel";
 import { providersService } from "@/features/providers/services/providers.service";
 import type { ProviderProfile } from "@/features/providers/types";
-import { profileVerificationLabels, profileVerificationTones, providerTypeLabels } from "@/features/providers/utils/labels";
+import { formatProviderTypes, profileVerificationLabels, profileVerificationTones } from "@/features/providers/utils/labels";
 import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
 import { ApiError, api } from "@/lib/api";
 import { clearSession, isAuthenticated } from "@/lib/auth";
@@ -241,7 +241,7 @@ export default function ProviderDashboardPage() {
             <StatCard title="Services" value={String(services)} hint={`${standards} standards · ${locations} locations`} />
             <StatCard
               title="Profile"
-              value={profile ? providerTypeLabels[profile.providerType] : "Not created"}
+              value={profile ? formatProviderTypes(profile.providerTypes) : "Not created"}
               hint={profile ? profileVerificationLabels[profile.verificationStatus] : "Add the fields below"}
             />
           </div>

@@ -8,11 +8,13 @@ import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { RefreshTokenStrategy } from './strategies/refresh-token.strategy.js';
 import { DatabaseModule } from '../../database/database.module.js';
+import { MailModule } from '../../common/mail/mail.module.js';
 import { RbacModule } from '../rbac/rbac.module.js';
 
 @Module({
   imports: [
     DatabaseModule,
+    MailModule,
     RbacModule,
     PassportModule,
     JwtModule.registerAsync({

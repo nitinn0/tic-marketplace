@@ -15,6 +15,9 @@ import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { MailService } from '../../common/mail/mail.service.js';
+import { randomBytes } from 'node:crypto';
 
 type PublicUser = {
   id: string;
@@ -35,6 +38,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly organizationAccess: OrganizationAccessService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -152,9 +156,63 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
-    return {
-      message: `Password reset instructions sent to ${dto.email}`,
-    };
+    const email = dto.email.toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Always return the same message so callers cannot probe for registered emails.
+    const message = 'If that email is registered, password reset instructions have been sent.';
+    if (!user || !user.passwordHash || user.status !== 'ACTIVE') {
+      return { message };
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(rawToken, 12);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const frontendUrl = this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
+    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+    await this.mail.send({
+      to: user.email,
+      subject: 'Reset your TIC Marketplace password',
+      text: `Reset your password using this link (expires in 1 hour):\n\n${resetUrl}\n`,
+      html: `<p>Reset your password using this link (expires in 1 hour):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+    });
+
+    return { message, ...(process.env.NODE_ENV !== 'production' ? { devResetUrl: resetUrl } : {}) };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const candidates = await this.prisma.passwordResetToken.findMany({
+      where: { usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { user: true },
+    });
+
+    let matched: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(dto.token, candidate.tokenHash)) {
+        matched = candidate;
+        break;
+      }
+    }
+    if (!matched) {
+      throw new BadRequestException('This reset link is invalid or has expired');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: matched.userId }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: matched.id }, data: { usedAt: new Date() } }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: matched.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Password updated. Sign in with your new password.' };
   }
 
   async getCurrentUser(requestUser: { sub: string }) {

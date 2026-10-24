@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../../common/audit/audit-actions.js';
+import { AuditService } from '../../common/audit/audit.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { PUBLIC_PROVIDER_PROFILE_WHERE } from '../providers/provider-visibility.js';
 import type { OrganizationAccessContext } from '../rbac/services/organization-access.service.js';
 import { locationLabel } from '../taxonomy/utils/location.util.js';
@@ -20,17 +23,21 @@ const buyerInclude = {
     },
   },
   quotes: {
-    where: { status: 'SUBMITTED' as const },
-    orderBy: { amount: 'asc' as const },
+    where: { status: { not: 'WITHDRAWN' as const } },
+    orderBy: [{ status: 'asc' as const }, { amount: 'asc' as const }],
     include: {
-      provider: { include: { organization: { select: { displayName: true } } } },
+      provider: { include: { organization: { select: { id: true, displayName: true } } } },
     },
   },
 } satisfies Prisma.RfqInclude;
 
 @Injectable()
 export class RfqService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async create(context: OrganizationAccessContext, userId: string, dto: CreateRfqDto) {
     const service = await this.prisma.service.findFirst({
@@ -82,6 +89,105 @@ export class RfqService {
     return this.toBuyerView(rfq);
   }
 
+  async acceptQuote(context: OrganizationAccessContext, actorId: string, rfqId: string, quoteId: string) {
+    const rfq = await this.prisma.rfq.findFirst({
+      where: { id: rfqId, buyerOrganizationId: context.organization.id },
+      include: { quotes: true },
+    });
+    if (!rfq) throw new NotFoundException('RFQ not found');
+    if (rfq.status !== 'OPEN') throw new BadRequestException('This RFQ is already closed');
+
+    const quote = rfq.quotes.find((row) => row.id === quoteId);
+    if (!quote || quote.status !== 'SUBMITTED') {
+      throw new BadRequestException('Only a submitted quote can be accepted');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rfqQuote.update({ where: { id: quote.id }, data: { status: 'ACCEPTED' } });
+      await tx.rfqQuote.updateMany({
+        where: { rfqId, id: { not: quote.id }, status: 'SUBMITTED' },
+        data: { status: 'REJECTED' },
+      });
+      await tx.rfq.update({ where: { id: rfqId }, data: { status: 'CLOSED' } });
+      await this.audit.log(
+        {
+          action: AUDIT_ACTIONS.rfqQuoteAccepted,
+          entityType: AUDIT_ENTITIES.rfqQuote,
+          entityId: quote.id,
+          organizationId: context.organization.id,
+          actorUserId: actorId,
+          metadata: { rfqId, providerId: quote.providerId },
+        },
+        tx,
+      );
+    });
+
+    const rejected = rfq.quotes.filter((row) => row.id !== quote.id && row.status === 'SUBMITTED');
+    await this.notifyProviders(
+      quote.providerId,
+      {
+        type: 'QUOTE_ACCEPTED',
+        title: 'Your quote was accepted',
+        body: `A buyer accepted your quote on “${rfq.title}”.`,
+        entityType: 'rfq',
+        entityId: rfqId,
+      },
+      rejected.map((row) => row.providerId),
+      {
+        type: 'QUOTE_REJECTED',
+        title: 'RFQ awarded to another provider',
+        body: `The buyer closed “${rfq.title}” with another quote.`,
+        entityType: 'rfq',
+        entityId: rfqId,
+      },
+    );
+
+    return this.getForBuyer(context, rfqId);
+  }
+
+  async closeRfq(context: OrganizationAccessContext, actorId: string, rfqId: string) {
+    const rfq = await this.prisma.rfq.findFirst({
+      where: { id: rfqId, buyerOrganizationId: context.organization.id },
+      include: { quotes: { where: { status: 'SUBMITTED' } } },
+    });
+    if (!rfq) throw new NotFoundException('RFQ not found');
+    if (rfq.status !== 'OPEN') throw new BadRequestException('This RFQ is already closed');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rfqQuote.updateMany({
+        where: { rfqId, status: 'SUBMITTED' },
+        data: { status: 'REJECTED' },
+      });
+      await tx.rfq.update({ where: { id: rfqId }, data: { status: 'CLOSED' } });
+      await this.audit.log(
+        {
+          action: AUDIT_ACTIONS.rfqClosed,
+          entityType: AUDIT_ENTITIES.rfq,
+          entityId: rfqId,
+          organizationId: context.organization.id,
+          actorUserId: actorId,
+          metadata: { reason: 'buyer_closed_without_award' },
+        },
+        tx,
+      );
+    });
+
+    await this.notifyProviders(
+      null,
+      null,
+      rfq.quotes.map((row) => row.providerId),
+      {
+        type: 'RFQ_CLOSED',
+        title: 'RFQ closed',
+        body: `The buyer closed “${rfq.title}” without accepting a quote.`,
+        entityType: 'rfq',
+        entityId: rfqId,
+      },
+    );
+
+    return this.getForBuyer(context, rfqId);
+  }
+
   async listForProvider(context: OrganizationAccessContext) {
     const profile = await this.profileFor(context.organization.id);
     if (!profile) return { rfqs: [] };
@@ -114,6 +220,13 @@ export class RfqService {
     if (!dispatch) throw new NotFoundException('RFQ not found');
     if (dispatch.rfq.status !== 'OPEN') throw new BadRequestException('This RFQ is closed');
 
+    const existing = await this.prisma.rfqQuote.findUnique({
+      where: { rfqId_providerId: { rfqId, providerId: profile.id } },
+    });
+    if (existing && (existing.status === 'ACCEPTED' || existing.status === 'REJECTED')) {
+      throw new BadRequestException('This quote can no longer be changed');
+    }
+
     await this.prisma.rfqQuote.upsert({
       where: { rfqId_providerId: { rfqId, providerId: profile.id } },
       create: {
@@ -136,7 +249,77 @@ export class RfqService {
         status: 'SUBMITTED',
       },
     });
+
+    const buyerUsers = await this.notifications.userIdsForOrganization(dispatch.rfq.buyerOrganizationId);
+    await this.notifications.createMany(
+      buyerUsers.map((buyerUserId) => ({
+        userId: buyerUserId,
+        type: 'QUOTE_SUBMITTED',
+        title: 'New quote received',
+        body: `A provider quoted on “${dispatch.rfq.title}”.`,
+        entityType: 'rfq',
+        entityId: rfqId,
+      })),
+    );
+
     return this.getForProvider(context, rfqId);
+  }
+
+  async withdrawQuote(context: OrganizationAccessContext, actorId: string, rfqId: string) {
+    const profile = await this.requireProfile(context.organization.id);
+    const quote = await this.prisma.rfqQuote.findUnique({
+      where: { rfqId_providerId: { rfqId, providerId: profile.id } },
+      include: { rfq: true },
+    });
+    if (!quote) throw new NotFoundException('Quote not found');
+    if (quote.rfq.status !== 'OPEN') throw new BadRequestException('This RFQ is closed');
+    if (quote.status !== 'SUBMITTED') throw new BadRequestException('Only a submitted quote can be withdrawn');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rfqQuote.update({ where: { id: quote.id }, data: { status: 'WITHDRAWN' } });
+      await this.audit.log(
+        {
+          action: AUDIT_ACTIONS.rfqQuoteWithdrawn,
+          entityType: AUDIT_ENTITIES.rfqQuote,
+          entityId: quote.id,
+          organizationId: context.organization.id,
+          actorUserId: actorId,
+          metadata: { rfqId },
+        },
+        tx,
+      );
+    });
+
+    return this.getForProvider(context, rfqId);
+  }
+
+  private async notifyProviders(
+    awardedProviderId: string | null,
+    awarded: Omit<Parameters<NotificationsService['create']>[0], 'userId'> | null,
+    otherProviderIds: string[],
+    other: Omit<Parameters<NotificationsService['create']>[0], 'userId'>,
+  ) {
+    const payloads: Parameters<NotificationsService['createMany']>[0] = [];
+    if (awardedProviderId && awarded) {
+      const org = await this.prisma.providerProfile.findUnique({
+        where: { id: awardedProviderId },
+        select: { organizationId: true },
+      });
+      if (org) {
+        const users = await this.notifications.userIdsForOrganization(org.organizationId);
+        payloads.push(...users.map((userId) => ({ userId, ...awarded })));
+      }
+    }
+    for (const providerId of otherProviderIds) {
+      const org = await this.prisma.providerProfile.findUnique({
+        where: { id: providerId },
+        select: { organizationId: true },
+      });
+      if (!org) continue;
+      const users = await this.notifications.userIdsForOrganization(org.organizationId);
+      payloads.push(...users.map((userId) => ({ userId, ...other })));
+    }
+    await this.notifications.createMany(payloads);
   }
 
   private async matchProviders(serviceId: string, categoryId: string, location: string) {
@@ -174,6 +357,7 @@ export class RfqService {
   }
 
   private toBuyerView(rfq: Prisma.RfqGetPayload<{ include: typeof buyerInclude }>) {
+    const accepted = rfq.quotes.find((quote) => quote.status === 'ACCEPTED') ?? null;
     return {
       id: rfq.id,
       title: rfq.title,
@@ -191,6 +375,7 @@ export class RfqService {
         score: dispatch.matchScore,
         reasons: asReasonList(dispatch.matchReasons),
       })),
+      awardedQuoteId: accepted?.id ?? null,
       quotes: rfq.quotes.map((quote) => ({
         id: quote.id,
         providerId: quote.providerId,
@@ -200,15 +385,12 @@ export class RfqService {
         scopeNotes: quote.scopeNotes,
         exclusions: quote.exclusions,
         timelineDays: quote.timelineDays,
+        status: quote.status,
         createdAt: quote.createdAt,
       })),
     };
   }
 
-  /**
-   * What a provider is allowed to see. Company name, email and the buyer's
-   * personal details are never selected into this payload.
-   */
   private toProviderView(
     rfq: Prisma.RfqGetPayload<{ include: ReturnType<RfqService['providerRfqInclude']> }>,
     reasons: Prisma.JsonValue,
@@ -236,6 +418,7 @@ export class RfqService {
             scopeNotes: quote.scopeNotes,
             exclusions: quote.exclusions,
             timelineDays: quote.timelineDays,
+            status: quote.status,
             createdAt: quote.createdAt,
           }
         : null,
@@ -245,7 +428,7 @@ export class RfqService {
   private providerRfqInclude(providerId: string) {
     return {
       service: { select: { name: true, slug: true } },
-      quotes: { where: { providerId, status: 'SUBMITTED' as const } },
+      quotes: { where: { providerId }, orderBy: { updatedAt: 'desc' as const }, take: 1 },
     } satisfies Prisma.RfqInclude;
   }
 

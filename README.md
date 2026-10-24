@@ -50,6 +50,9 @@ NODE_ENV="development"
 NEXT_PUBLIC_API_URL="http://localhost:4011/api/v1"
 ```
 
+**Deployed frontend:** set `NEXT_PUBLIC_API_URL` to your Nest API base (e.g. `https://api.example.com/api/v1`). Authenticated RFQ, provider, org, and admin APIs require Nest. Do not rely on the Next `/api/v1` proxy for those routes.
+
+
 ## Start PostgreSQL with Docker
 
 ```bash

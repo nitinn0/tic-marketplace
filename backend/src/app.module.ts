@@ -18,6 +18,8 @@ import { ProvidersModule } from './modules/providers/providers.module.js';
 import { ProfessionalsModule } from './modules/professionals/professionals.module.js';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module.js';
 import { RfqModule } from './modules/rfq/rfq.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { AdminProvidersModule } from './modules/admin-providers/admin-providers.module.js';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { RfqModule } from './modules/rfq/rfq.module.js';
     ProfessionalsModule,
     MarketplaceModule,
     RfqModule,
+    NotificationsModule,
+    AdminProvidersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

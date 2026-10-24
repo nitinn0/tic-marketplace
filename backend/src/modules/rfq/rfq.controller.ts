@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotImplementedException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -38,6 +49,47 @@ export class BuyerRfqController {
   get(@CurrentOrganization() context: OrganizationAccessContext, @Param('id', ParseUUIDPipe) id: string) {
     return this.rfqs.getForBuyer(context, id);
   }
+
+  @Post(':id/quotes/:quoteId/accept')
+  @RequirePermission(R.buyer, 'edit')
+  acceptQuote(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('quoteId', ParseUUIDPipe) quoteId: string,
+  ) {
+    return this.rfqs.acceptQuote(context, user.sub, id, quoteId);
+  }
+
+  @Post(':id/close')
+  @RequirePermission(R.buyer, 'edit')
+  close(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.rfqs.closeRfq(context, user.sub, id);
+  }
+
+  /** Stub — payment capture lands in a later release. */
+  @Post(':id/payments/intent')
+  @RequirePermission(R.buyer, 'edit')
+  paymentIntent() {
+    throw new NotImplementedException({
+      status: 'not_implemented',
+      message: 'Payments are not available yet. Award a quote first; checkout will follow.',
+    });
+  }
+
+  /** Stub — buyer/provider messaging lands in a later release. */
+  @Get(':id/messages')
+  @RequirePermission(R.buyer, 'view')
+  messages() {
+    throw new NotImplementedException({
+      status: 'not_implemented',
+      message: 'Messaging is not available yet.',
+    });
+  }
 }
 
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -67,5 +119,24 @@ export class ProviderRfqController {
     @Body() dto: SubmitQuoteDto,
   ) {
     return this.rfqs.submitQuote(context, user.sub, id, dto);
+  }
+
+  @Post(':id/quotes/withdraw')
+  @RequirePermission(R.provider, 'edit')
+  withdraw(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.rfqs.withdrawQuote(context, user.sub, id);
+  }
+
+  @Get(':id/messages')
+  @RequirePermission(R.provider, 'view')
+  messages() {
+    throw new NotImplementedException({
+      status: 'not_implemented',
+      message: 'Messaging is not available yet.',
+    });
   }
 }

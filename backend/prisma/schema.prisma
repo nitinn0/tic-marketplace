@@ -37,6 +37,8 @@ model User {
   professionalProfile     ProfessionalProfile?
   createdRfqs             Rfq[]                    @relation("RfqCreatedBy")
   submittedQuotes         RfqQuote[]               @relation("QuoteSubmittedBy")
+  notifications           Notification[]
+  passwordResetTokens     PasswordResetToken[]
 
   @@index([email])
   @@index([status])
@@ -663,6 +665,8 @@ enum RfqStatus {
 enum QuoteStatus {
   SUBMITTED
   WITHDRAWN
+  ACCEPTED
+  REJECTED
 }
 
 model Rfq {
@@ -730,4 +734,37 @@ model RfqQuote {
   @@unique([rfqId, providerId])
   @@index([providerId])
   @@map("rfq_quotes")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String
+  title      String
+  body       String
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

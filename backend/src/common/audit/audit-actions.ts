@@ -25,6 +25,11 @@ export const AUDIT_ACTIONS = {
   professionalExperienceCreated: 'PROFESSIONAL_EXPERIENCE_CREATED',
   professionalExperienceUpdated: 'PROFESSIONAL_EXPERIENCE_UPDATED',
   professionalExperienceDeleted: 'PROFESSIONAL_EXPERIENCE_DELETED',
+  rfqQuoteAccepted: 'RFQ_QUOTE_ACCEPTED',
+  rfqClosed: 'RFQ_CLOSED',
+  rfqQuoteWithdrawn: 'RFQ_QUOTE_WITHDRAWN',
+  providerVerified: 'PROVIDER_VERIFIED',
+  providerVerificationRejected: 'PROVIDER_VERIFICATION_REJECTED',
 } as const;
 
 export const AUDIT_ENTITIES = {
@@ -40,4 +45,7 @@ export const AUDIT_ENTITIES = {
   providerProfile: 'provider_profile',
   professionalProfile: 'professional_profile',
   professionalExperience: 'professional_experience',
+  rfq: 'rfq',
+  rfqQuote: 'rfq_quote',
+  notification: 'notification',
 } as const;

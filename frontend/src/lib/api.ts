@@ -18,19 +18,24 @@ function isBrowserOnRemoteHost() {
   return hostname !== "localhost" && hostname !== "127.0.0.1";
 }
 
+/**
+ * Authenticated marketplace APIs use Nest. Deployed frontends must set
+ * NEXT_PUBLIC_API_URL to the Nest base (e.g. https://api.example.com/api/v1).
+ * The Next /api/v1 proxy is not a full Nest substitute.
+ */
 export function getApiBaseUrl() {
   if (configuredApiUrl && !isLoopbackApiUrl(configuredApiUrl)) {
     return configuredApiUrl;
   }
 
   if (isBrowserOnRemoteHost()) {
-    return "/api/v1";
+    return "";
   }
 
   return configuredApiUrl || "http://localhost:4011/api/v1";
 }
 
-// The in-app Next.js API route validates Supabase tokens; the Nest backend only accepts its own JWTs.
+/** True only when the client is deliberately pointed at a same-origin path API (legacy). */
 export function usesSupabaseAuth() {
   return getApiBaseUrl().startsWith("/");
 }
@@ -60,6 +65,13 @@ function getStoredAuthToken() {
   return window.localStorage.getItem("tic_access_token");
 }
 
+function getStoredRefreshToken() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem("tic_refresh_token");
+}
+
 export function getActiveOrganizationId() {
   if (typeof window === "undefined") {
     return null;
@@ -81,13 +93,47 @@ export function setActiveOrganizationId(organizationId: string | null) {
   }
 }
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (usesSupabaseAuth()) return false;
+  const refreshToken = getStoredRefreshToken();
+  const apiBaseUrl = getApiBaseUrl();
+  if (!refreshToken || !apiBaseUrl) return false;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!response.ok) return false;
+        const data = (await response.json()) as {
+          accessToken: string;
+          refreshToken: string;
+          user?: unknown;
+        };
+        window.localStorage.setItem("tic_access_token", data.accessToken);
+        window.localStorage.setItem("tic_refresh_token", data.refreshToken);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}, didRefresh = false): Promise<T> {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
-    throw new Error("API is not configured for this environment.");
+    throw new Error(
+      "API is not configured. Set NEXT_PUBLIC_API_URL to your Nest API base (…/api/v1) for this deployment.",
+    );
   }
 
   const url = `${apiBaseUrl}${endpoint}`;
@@ -95,7 +141,7 @@ async function request<T>(
   const { headers: customHeaders, ...init } = options;
 
   const headers = new Headers(customHeaders);
-  if (!headers.has("Content-Type")) {
+  if (!headers.has("Content-Type") && init.body) {
     headers.set("Content-Type", "application/json");
   }
   if (token && !headers.has("Authorization")) {
@@ -107,6 +153,20 @@ async function request<T>(
   }
 
   const response = await fetch(url, { ...init, headers });
+
+  if (response.status === 401 && !didRefresh && !endpoint.startsWith("/auth/")) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return request<T>(endpoint, options, true);
+    }
+    window.localStorage.removeItem("tic_access_token");
+    window.localStorage.removeItem("tic_refresh_token");
+    window.localStorage.removeItem("tic_user");
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+      window.location.assign(`/login?next=${next}`);
+    }
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -131,29 +191,42 @@ async function request<T>(
   return (await response.json()) as T;
 }
 
+export async function logoutRemote() {
+  const refreshToken = getStoredRefreshToken();
+  const apiBaseUrl = getApiBaseUrl();
+  if (!refreshToken || !apiBaseUrl || usesSupabaseAuth()) return;
+  try {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch {
+    // Local clear still happens.
+  }
+}
+
 export const api = {
-  get: <T>(endpoint: string, options?: RequestInit) =>
-    request<T>(endpoint, { method: "GET", ...options }),
+  get: <T>(endpoint: string, options?: RequestInit) => request<T>(endpoint, { method: "GET", ...options }),
   post: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
     request<T>(endpoint, {
       method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       ...options,
     }),
   patch: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
     request<T>(endpoint, {
       method: "PATCH",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       ...options,
     }),
   put: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>
     request<T>(endpoint, {
       method: "PUT",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       ...options,
     }),
-  delete: <T>(endpoint: string, options?: RequestInit) =>
-    request<T>(endpoint, { method: "DELETE", ...options }),
+  delete: <T>(endpoint: string, options?: RequestInit) => request<T>(endpoint, { method: "DELETE", ...options }),
 };
 
 export default api;

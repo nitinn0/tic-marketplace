@@ -19,17 +19,21 @@ import { ApiError, api } from "@/lib/api";
 import { clearSession, isAuthenticated } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 
-type RfqGroup = "PENDING" | "ACCEPTED" | string;
+type RfqGroup = "PENDING" | "QUOTED" | "AWARDED" | "CLOSED" | string;
 
 function rfqGroup(rfq: ProviderRfq): RfqGroup {
-  if (rfq.quote) return "ACCEPTED";
+  if (rfq.quote?.status === "ACCEPTED") return "AWARDED";
+  if (rfq.quote?.status === "SUBMITTED") return "QUOTED";
+  if (rfq.status === "CLOSED") return "CLOSED";
   if (!rfq.status || rfq.status === "OPEN") return "PENDING";
   return rfq.status;
 }
 
 function groupLabel(group: RfqGroup) {
   if (group === "PENDING") return "Pending";
-  if (group === "ACCEPTED") return "Accepted";
+  if (group === "QUOTED") return "Quoted";
+  if (group === "AWARDED") return "Awarded";
+  if (group === "CLOSED") return "Closed";
   return group
     .toLowerCase()
     .split("_")
@@ -105,8 +109,16 @@ export default function ProviderDashboardPage() {
   }, [status, organizationId]);
 
   const quoted = rfqs.filter((rfq) => rfq.quote);
-  const otherGroups = [...new Set(rfqs.map(rfqGroup).filter((group) => group !== "PENDING" && group !== "ACCEPTED"))];
-  const filters: Array<RfqGroup | "ALL"> = ["ALL", "PENDING", "ACCEPTED", ...(otherGroups.length ? otherGroups : ["CLOSED"])];
+  const otherGroups = [
+    ...new Set(rfqs.map(rfqGroup).filter((group) => group !== "PENDING" && group !== "QUOTED" && group !== "AWARDED")),
+  ];
+  const filters: Array<RfqGroup | "ALL"> = [
+    "ALL",
+    "PENDING",
+    "QUOTED",
+    "AWARDED",
+    ...(otherGroups.length ? otherGroups : ["CLOSED"]),
+  ];
   const visibleRfqs = rfqFilter === "ALL" ? rfqs : rfqs.filter((rfq) => rfqGroup(rfq) === rfqFilter);
   const services = profile?.capabilities.services.length ?? 0;
   const standards = profile?.capabilities.standards.length ?? 0;
@@ -222,7 +234,7 @@ export default function ProviderDashboardPage() {
                             {rfq.quote ? ` · ${formatMoney(rfq.quote.amount, rfq.quote.currency)}` : ""}
                           </span>
                         </span>
-                        <Badge tone={group === "ACCEPTED" ? "success" : group === "PENDING" ? "warning" : "neutral"}>
+                        <Badge tone={group === "AWARDED" ? "success" : group === "PENDING" ? "warning" : "neutral"}>
                           {groupLabel(group)}
                         </Badge>
                       </li>

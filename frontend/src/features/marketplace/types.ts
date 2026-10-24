@@ -41,6 +41,8 @@ export type MarketplaceHome = {
   industries: string[];
 };
 
+export type QuoteStatus = "SUBMITTED" | "WITHDRAWN" | "ACCEPTED" | "REJECTED";
+
 export type BuyerQuote = {
   id: string;
   providerId: string;
@@ -50,6 +52,7 @@ export type BuyerQuote = {
   scopeNotes: string;
   exclusions: string | null;
   timelineDays: number | null;
+  status: QuoteStatus;
   createdAt: string;
 };
 
@@ -65,6 +68,7 @@ export type BuyerRfq = {
   createdAt: string;
   service: { id: string; name: string; slug: string };
   matches: { providerId: string; name: string; score: number; reasons: string[] }[];
+  awardedQuoteId: string | null;
   quotes: BuyerQuote[];
 };
 
@@ -89,6 +93,7 @@ export type ProviderRfq = {
     scopeNotes: string;
     exclusions: string | null;
     timelineDays: number | null;
+    status: QuoteStatus;
     createdAt: string;
   } | null;
 };

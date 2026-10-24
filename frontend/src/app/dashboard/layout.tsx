@@ -1,19 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-import { isAuthenticated } from "@/lib/auth";
-import { routes } from "@/lib/constants";
+import { RequireAuth } from "@/components/auth/require-auth";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace(routes.login);
-    }
-  }, [router]);
-
-  return <>{children}</>;
+  return <RequireAuth>{children}</RequireAuth>;
 }

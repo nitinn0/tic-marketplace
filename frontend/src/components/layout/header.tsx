@@ -5,6 +5,7 @@ import { OrganizationSwitcher } from "@/features/organizations/components/organi
 
 import { AccountMenu } from "./account-menu";
 import { HeaderNav } from "./header-nav";
+import { NotificationsBell } from "./notifications-bell";
 
 export function Header() {
   return (
@@ -26,6 +27,7 @@ export function Header() {
 
         <div className="flex shrink-0 items-center gap-3">
           <OrganizationSwitcher />
+          <NotificationsBell />
           <AccountMenu />
         </div>
       </div>

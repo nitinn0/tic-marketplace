@@ -120,8 +120,12 @@ export function AccountMenu() {
                   type="button"
                   className="shrink-0 font-semibold text-red-600 hover:text-red-700"
                   onClick={() => {
-                    clearSession();
-                    window.location.href = routes.login;
+                    void import("@/lib/api").then(({ logoutRemote }) =>
+                      logoutRemote().finally(() => {
+                        clearSession();
+                        window.location.href = routes.login;
+                      }),
+                    );
                   }}
                 >
                   Sign out

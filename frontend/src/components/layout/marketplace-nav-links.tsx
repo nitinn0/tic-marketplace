@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardList, FlaskConical, Tags, UserRound } from "lucide-react";
+import { BadgeCheck, ClipboardList, FlaskConical, Tags, UserRound } from "lucide-react";
 
 import { routes } from "@/lib/constants";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import {
   hasPermission,
   MARKETPLACE_FUNCTIONALITIES,
+  ORGANIZATION_FUNCTIONALITIES,
   PROFESSIONAL_FUNCTIONALITIES,
   PROVIDER_FUNCTIONALITIES,
 } from "@/features/organizations/utils/permissions";
@@ -24,6 +25,7 @@ export function MarketplaceNavLinks({ menu = false, onNavigate }: { menu?: boole
   const canViewTaxonomy = Object.values(MARKETPLACE_FUNCTIONALITIES).some((code) =>
     hasPermission(me.permissions, code, "view"),
   );
+  const canVerifyProviders = hasPermission(me.permissions, ORGANIZATION_FUNCTIONALITIES.platformAccess, "view");
   const canViewProvider =
     activeOrganization?.organizationType === "PROVIDER" &&
     hasPermission(activeContext?.permissions, PROVIDER_FUNCTIONALITIES.profile, "view");
@@ -56,6 +58,12 @@ export function MarketplaceNavLinks({ menu = false, onNavigate }: { menu?: boole
             Taxonomy
           </Link>
         ) : null}
+        {canVerifyProviders ? (
+          <Link href={routes.adminVerification} role="menuitem" className={menuClass} onClick={onNavigate}>
+            <BadgeCheck className="h-4 w-4 text-slate-500" />
+            Verification
+          </Link>
+        ) : null}
       </>
     );
   }
@@ -80,6 +88,11 @@ export function MarketplaceNavLinks({ menu = false, onNavigate }: { menu?: boole
       {canViewTaxonomy ? (
         <Link href={routes.adminTaxonomy} className={linkClass}>
           Taxonomy
+        </Link>
+      ) : null}
+      {canVerifyProviders ? (
+        <Link href={routes.adminVerification} className={linkClass}>
+          Verification
         </Link>
       ) : null}
     </>

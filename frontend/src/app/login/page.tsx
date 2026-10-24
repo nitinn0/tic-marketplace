@@ -114,7 +114,15 @@ export default function LoginPage() {
             />
           </AuthField>
 
-          <AuthField label="Password" htmlFor="password">
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <label htmlFor="password" className="text-sm font-medium text-slate-700">
+                Password
+              </label>
+              <Link href={routes.forgotPassword} className="text-xs font-medium text-sky-700 hover:text-sky-800">
+                Forgot password?
+              </Link>
+            </div>
             <AuthPasswordInput
               id="password"
               name="password"
@@ -124,7 +132,7 @@ export default function LoginPage() {
               placeholder="Enter your password"
               required
             />
-          </AuthField>
+          </div>
 
           {error ? (
             <div

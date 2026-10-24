@@ -7,6 +7,7 @@ export const ORGANIZATION_FUNCTIONALITIES = {
   members: "organizations.members",
   memberRoles: "organizations.member_roles",
   ownership: "organizations.ownership",
+  platformAccess: "organizations.platform_access",
 } as const;
 
 /** Mirrors backend MARKETPLACE_FUNCTIONALITIES (taxonomy master data, global roles). */

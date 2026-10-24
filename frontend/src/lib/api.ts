@@ -1,4 +1,10 @@
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+declare global {
+  interface Window {
+    __TIC_API_URL__?: string;
+  }
+}
+
+const buildTimeApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
 
 function isLoopbackApiUrl(url: string) {
   try {
@@ -9,21 +15,39 @@ function isLoopbackApiUrl(url: string) {
   }
 }
 
+function isPrivateOrLocalHostname(hostname: string) {
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") return true;
+  if (hostname.endsWith(".local")) return true;
+  // LAN / private ranges — treat like local so Next on a phone/LAN IP can reach Nest.
+  if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+  if (/^192\.168\.\d+\.\d+$/.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(hostname)) return true;
+  return false;
+}
+
 function isBrowserOnRemoteHost() {
   if (typeof window === "undefined") {
     return false;
   }
+  return !isPrivateOrLocalHostname(window.location.hostname);
+}
 
-  const { hostname } = window.location;
-  return hostname !== "localhost" && hostname !== "127.0.0.1";
+function resolvedConfiguredApiUrl() {
+  if (typeof window !== "undefined") {
+    const runtime = (window.__TIC_API_URL__ ?? "").trim();
+    if (runtime) return runtime;
+  }
+  return buildTimeApiUrl;
 }
 
 /**
  * Authenticated marketplace APIs use Nest. Deployed frontends must set
- * NEXT_PUBLIC_API_URL to the Nest base (e.g. https://api.example.com/api/v1).
+ * NEXT_PUBLIC_API_URL (or API_URL) to the Nest base (e.g. https://tic-backend.onrender.com/api/v1).
  * The Next /api/v1 proxy is not a full Nest substitute.
  */
 export function getApiBaseUrl() {
+  const configuredApiUrl = resolvedConfiguredApiUrl();
+
   if (configuredApiUrl && !isLoopbackApiUrl(configuredApiUrl)) {
     return configuredApiUrl;
   }

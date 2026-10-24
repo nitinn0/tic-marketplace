@@ -4,8 +4,9 @@ services:
     runtime: node
     rootDir: backend
     plan: free
+    # Nest CLI is a devDependency — include it during build even when NODE_ENV=production.
     buildCommand: |
-      npm install
+      npm install --include=dev
       npx prisma generate
       npm run build
     startCommand: |
@@ -14,14 +15,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "4011"
       - key: DATABASE_URL
         value: postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres?sslmode=require
       - key: DIRECT_URL
         value: postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres?sslmode=require
       - key: FRONTEND_URL
-        value: https://tic-frontend.onrender.com
+        value: https://tic-marketplace.vercel.app
+      - key: CORS_ORIGINS
+        value: https://tic-marketplace.vercel.app,https://tic-frontend.onrender.com
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_TTL
@@ -42,5 +43,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Baked into the client at build time; also read at request time via ApiConfigScript.
       - key: NEXT_PUBLIC_API_URL
+        value: https://tic-backend.onrender.com/api/v1
+      # Runtime fallback if the frontend was built before NEXT_PUBLIC_ was set.
+      - key: API_URL
         value: https://tic-backend.onrender.com/api/v1

@@ -15,32 +15,33 @@ async function bootstrap() {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  const allowedOrigins = [
-    frontendUrl,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    ...configuredCorsOrigins,
-  ];
+  const allowedOrigins = new Set(
+    [frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000', ...configuredCorsOrigins].filter(Boolean),
+  );
+
+  const isAllowedOrigin = (origin: string) =>
+    allowedOrigins.has(origin) ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ||
+    /^https:\/\/[\w-]+\.onrender\.com$/.test(origin) ||
+    /^https:\/\/[\w-]+(?:-[\w-]+)*\.vercel\.app$/.test(origin);
 
   app.setGlobalPrefix('api/v1');
   app.enableVersioning();
   app.enableCors({
     origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ||
-        /^https:\/\/.*\.onrender\.com$/.test(origin) ||
-        /^https:\/\/.*\.vercel\.app$/.test(origin)
-      ) {
+      // Reflect allowed origins; never throw — throwing skips ACAO headers and breaks browsers.
+      if (!origin || isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
-
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Type'],
     credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   app.useGlobalPipes(

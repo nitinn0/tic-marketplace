@@ -50,7 +50,7 @@ NODE_ENV="development"
 NEXT_PUBLIC_API_URL="http://localhost:4011/api/v1"
 ```
 
-**Deployed frontend:** set `NEXT_PUBLIC_API_URL` to your Nest API base (e.g. `https://api.example.com/api/v1`). Authenticated RFQ, provider, org, and admin APIs require Nest. Do not rely on the Next `/api/v1` proxy for those routes.
+**Deployed frontend:** set `NEXT_PUBLIC_API_URL` (and optionally `API_URL`) on the frontend service to your Nest API base (e.g. `https://tic-backend.onrender.com/api/v1`), then redeploy. Authenticated RFQ, provider, org, and admin APIs require Nest. Do not rely on the Next `/api/v1` proxy for those routes.
 
 
 ## Start PostgreSQL with Docker

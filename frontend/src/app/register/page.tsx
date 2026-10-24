@@ -3,8 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  AuthField,
+  AuthInput,
+  AuthPasswordInput,
+  PasswordStrengthMeter,
+} from "@/features/auth/components/auth-field";
+import { AuthShell } from "@/features/auth/components/auth-shell";
 import { api } from "@/lib/api";
 import { saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
@@ -31,15 +39,18 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const canSubmit =
+    firstName.trim().length >= 2 && lastName.trim().length >= 2 && email.trim().includes("@") && password.length >= 8;
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
     try {
       const result = await api.post<RegisterResponse>("/auth/register", {
-        firstName,
-        lastName,
-        email,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
         password,
       });
       saveSession(result);
@@ -53,66 +64,114 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-lg items-center px-4 py-12">
-      <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">New customer</p>
-        <h1 className="mt-3 text-2xl font-bold text-slate-900">Create your account</h1>
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+    <AuthShell
+      eyebrow="Buyer account"
+      title="Create your account"
+      description="Register once, then request quotes, track responses, and collaborate inside your buyer organization."
+      highlights={[
+        "One account for RFQs, quotes and organization membership",
+        "Invite teammates when your organization is ready",
+        "Switch to provider onboarding anytime from Join as provider",
+      ]}
+    >
+      <div className="auth-rise">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sign up</p>
+        <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">Get started</h2>
+        <p className="mt-2 text-sm text-slate-600">Takes under a minute. No credit card required.</p>
+
+        <form className="mt-8 space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-slate-700">
-              First name
-              <input
+            <AuthField label="First name" htmlFor="firstName">
+              <AuthInput
+                id="firstName"
+                name="firstName"
+                autoComplete="given-name"
+                autoFocus
                 required
                 minLength={2}
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:bg-white"
+                placeholder="Priya"
               />
-            </label>
-            <label className="block text-sm font-medium text-slate-700">
-              Last name
-              <input
+            </AuthField>
+            <AuthField label="Last name" htmlFor="lastName">
+              <AuthInput
+                id="lastName"
+                name="lastName"
+                autoComplete="family-name"
                 required
                 minLength={2}
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:bg-white"
+                placeholder="Sharma"
               />
-            </label>
+            </AuthField>
           </div>
-          <label className="block text-sm font-medium text-slate-700">
-            Email
-            <input
-              required
+
+          <AuthField label="Work email" htmlFor="email">
+            <AuthInput
+              id="email"
+              name="email"
               type="email"
+              autoComplete="email"
+              inputMode="email"
+              required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:bg-white"
+              placeholder="you@company.com"
             />
-          </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Password
-            <input
+          </AuthField>
+
+          <AuthField label="Password" htmlFor="password" hint="At least 8 characters.">
+            <AuthPasswordInput
+              id="password"
+              name="password"
+              autoComplete="new-password"
               required
-              type="password"
               minLength={8}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:bg-white"
+              placeholder="Create a password"
             />
-          </label>
-          {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Sign-Up"}
+            <PasswordStrengthMeter password={password} />
+          </AuthField>
+
+          {error ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          ) : null}
+
+          <Button type="submit" className="mt-1 h-11 w-full text-sm font-semibold" disabled={loading || !canSubmit}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Creating account…
+              </>
+            ) : (
+              "Create account"
+            )}
           </Button>
         </form>
-        <p className="mt-4 text-sm text-slate-600">
+
+        <p className="mt-6 text-center text-sm text-slate-600">
           Already have an account?{" "}
-          <Link href={routes.login} className="font-medium text-sky-700">
-            Login Now
+          <Link href={routes.login} className="font-semibold text-sky-700 transition hover:text-sky-800">
+            Sign in
           </Link>
         </p>
       </div>
-    </div>
+
+      <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 text-sm text-slate-600">
+        Listing lab or certification services?{" "}
+        <Link href={routes.join} className="font-semibold text-sky-700 transition hover:text-sky-800">
+          Join as a provider
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

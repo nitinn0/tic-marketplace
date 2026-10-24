@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AuthField, AuthInput, AuthPasswordInput } from "@/features/auth/components/auth-field";
+import { AuthShell } from "@/features/auth/components/auth-shell";
 import { organizationsService } from "@/features/organizations/services/organizations.service";
 import { api, usesSupabaseAuth } from "@/lib/api";
 import { homeForMemberships, requestedNext } from "@/lib/home-route";
@@ -35,8 +39,8 @@ async function destinationAfterLogin() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("bob+auth@example.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -60,8 +64,8 @@ export default function LoginPage() {
           JSON.stringify({
             id: authData.user?.id ?? "supabase-user",
             email: authData.user?.email ?? email,
-            firstName: metadata.first_name ?? "Bob",
-            lastName: metadata.last_name ?? "Auth",
+            firstName: metadata.first_name ?? "",
+            lastName: metadata.last_name ?? "",
             status: "ACTIVE",
           }),
         );
@@ -84,73 +88,80 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4 py-12">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-2">
-        <div className="bg-sky-700 p-8 text-white sm:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">
-            TIC Marketplace
-          </p>
-          <h1 className="mt-4 text-3xl font-bold">Welcome back</h1>
-          <p className="mt-4 max-w-sm text-sky-100">
-            Access the marketplace, manage permissions, and work in the admin workspace.
-          </p>
+    <AuthShell
+      eyebrow="Secure workspace access"
+      title="Welcome back"
+      description="Sign in to manage RFQs, quotes, provider profiles, and organization permissions."
+    >
+      <div className="auth-rise">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sign in</p>
+        <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">Your workspace</h2>
+        <p className="mt-2 text-sm text-slate-600">Use the email and password for your TIC Marketplace account.</p>
 
-          <div className="mt-8 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm">
-            <p className="font-semibold">Demo super admin</p>
-            <p className="mt-2 text-sky-100">bob+auth@example.com</p>
-            <p className="text-sky-100">password123</p>
-          </div>
-        </div>
+        <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
+          <AuthField label="Email" htmlFor="email">
+            <AuthInput
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              inputMode="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@company.com"
+              required
+            />
+          </AuthField>
 
-        <div className="p-8 sm:p-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Sign in
-          </p>
-          <h2 className="mt-3 text-2xl font-bold text-slate-900">Your workspace</h2>
+          <AuthField label="Password" htmlFor="password">
+            <AuthPasswordInput
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              required
+            />
+          </AuthField>
 
-          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-sky-500 focus:bg-white"
-                placeholder="you@company.com"
-                required
-              />
+          {error ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+            >
+              {error}
             </div>
+          ) : null}
 
-            <div>
-              <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-sky-500 focus:bg-white"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+          <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={loading || !email || !password}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Signing in…
+              </>
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
 
-            {error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </div>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          New here?{" "}
+          <Link href={routes.register} className="font-semibold text-sky-700 transition hover:text-sky-800">
+            Create an account
+          </Link>
+        </p>
       </div>
-    </div>
+
+      <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 text-sm text-slate-600">
+        Offering TIC services?{" "}
+        <Link href={routes.join} className="font-semibold text-sky-700 transition hover:text-sky-800">
+          Join as a provider
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

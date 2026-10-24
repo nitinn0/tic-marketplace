@@ -210,7 +210,7 @@ export default function JoinPage() {
                     autoComplete="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@company.com"
+                    placeholder="Enter your email"
                   />
                 </AuthField>
                 <AuthField label="Password" htmlFor="password" hint="At least 8 characters.">

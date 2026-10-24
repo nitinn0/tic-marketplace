@@ -109,7 +109,7 @@ export default function LoginPage() {
               inputMode="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@company.com"
+              placeholder="Enter your email"
               required
             />
           </AuthField>

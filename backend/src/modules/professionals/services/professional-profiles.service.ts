@@ -3,11 +3,19 @@ import type { Prisma, ProfessionalExperience, ProfessionalProfile } from '@prism
 
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../../../common/audit/audit-actions.js';
 import { AuditService } from '../../../common/audit/audit.service.js';
+import {
+  COMPANY_CLASSIFICATION_BLOCKED_MESSAGE,
+  containsCompanyClassification,
+} from '../../../common/moderation/company-classification.js';
 import { isUniqueViolation } from '../../../common/utils/prisma-errors.js';
 import { diffChanges, optionalText } from '../../../common/utils/record-changes.js';
 import { PrismaService } from '../../../database/prisma.service.js';
 import { CreateExperienceDto, UpdateExperienceDto } from '../dto/professional-experience.dto.js';
-import { CreateProfessionalProfileDto, UpdateProfessionalProfileDto } from '../dto/professional-profile.dto.js';
+import {
+  CreateProfessionalProfileDto,
+  OnboardProfessionalDto,
+  UpdateProfessionalProfileDto,
+} from '../dto/professional-profile.dto.js';
 import { isProfessionalProfilePubliclyVisible, PUBLIC_PROFESSIONAL_PROFILE_WHERE } from '../professional-visibility.js';
 
 const EXPERIENCE_ORDER: Prisma.ProfessionalExperienceOrderByWithRelationInput[] = [
@@ -39,6 +47,14 @@ function assertDateRange(startDate: string, endDate: string | null) {
   if (endDate && endDate < startDate) throw new BadRequestException('endDate cannot be before startDate');
 }
 
+function assertIndividualName(...parts: Array<string | null | undefined>) {
+  const fullName = parts.filter(Boolean).join(' ').trim();
+  if (!fullName) return;
+  if (containsCompanyClassification(fullName)) {
+    throw new BadRequestException(COMPANY_CLASSIFICATION_BLOCKED_MESSAGE);
+  }
+}
+
 /**
  * Professional profiles belong to an individual user; every operation is keyed by the
  * authenticated user's id, so one user can never read or change another user's profile.
@@ -54,7 +70,7 @@ export class ProfessionalProfilesService {
     const profile = await this.prisma.professionalProfile.findUnique({
       where: { userId },
       include: {
-        user: { select: { status: true } },
+        user: { select: { status: true, firstName: true, lastName: true } },
         experience: { orderBy: EXPERIENCE_ORDER },
       },
     });
@@ -62,12 +78,90 @@ export class ProfessionalProfilesService {
 
     return {
       ...this.toProfile(profile),
+      firstName: profile.user.firstName,
+      lastName: profile.user.lastName,
       publiclyVisible: isProfessionalProfilePubliclyVisible(profile, profile.user),
       experience: profile.experience.map(toExperience),
     };
   }
 
+  /**
+   * Self-serve join for independents. Assigns the PROFESSIONAL global role, updates the
+   * personal name (rejecting company classifications), and creates the profile.
+   */
+  async onboard(userId: string, dto: OnboardProfessionalDto) {
+    assertIndividualName(dto.firstName, dto.lastName);
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, status: true } });
+    if (!user || user.status !== 'ACTIVE') {
+      throw new BadRequestException('User account is not active');
+    }
+
+    if (await this.prisma.professionalProfile.findUnique({ where: { userId }, select: { id: true } })) {
+      throw new ConflictException('You already have a professional profile');
+    }
+
+    const role = await this.prisma.role.findUnique({ where: { code: 'PROFESSIONAL' } });
+    if (!role) {
+      throw new BadRequestException('Professional role is not configured');
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: { firstName: dto.firstName.trim(), lastName: dto.lastName.trim() },
+        });
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId, roleId: role.id } },
+          update: {},
+          create: { userId, roleId: role.id },
+        });
+        const profile = await tx.professionalProfile.create({
+          data: {
+            userId,
+            professionalType: dto.professionalType,
+            headline: optionalText(dto.headline) ?? null,
+            bio: optionalText(dto.bio) ?? null,
+            baseCity: optionalText(dto.baseCity) ?? null,
+            primaryAccreditation: optionalText(dto.primaryAccreditation) ?? null,
+            yearsExperience: dto.yearsExperience ?? null,
+            availabilityStatus: dto.availabilityStatus ?? 'AVAILABLE',
+            publicProfile: dto.publicProfile ?? true,
+          },
+        });
+        await this.audit.log(
+          {
+            action: AUDIT_ACTIONS.professionalProfileCreated,
+            entityType: AUDIT_ENTITIES.professionalProfile,
+            entityId: profile.id,
+            actorUserId: userId,
+            targetUserId: userId,
+            metadata: {
+              professionalType: profile.professionalType,
+              publicProfile: profile.publicProfile,
+              onboard: true,
+            },
+          },
+          tx,
+        );
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ConflictException('You already have a professional profile');
+      throw error;
+    }
+
+    return this.get(userId);
+  }
+
   async create(userId: string, dto: CreateProfessionalProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    assertIndividualName(user.firstName, user.lastName);
+
     if (await this.prisma.professionalProfile.findUnique({ where: { userId }, select: { id: true } })) {
       throw new ConflictException('You already have a professional profile');
     }
@@ -80,6 +174,8 @@ export class ProfessionalProfilesService {
             professionalType: dto.professionalType,
             headline: optionalText(dto.headline) ?? null,
             bio: optionalText(dto.bio) ?? null,
+            baseCity: optionalText(dto.baseCity) ?? null,
+            primaryAccreditation: optionalText(dto.primaryAccreditation) ?? null,
             yearsExperience: dto.yearsExperience ?? null,
             availabilityStatus: dto.availabilityStatus ?? 'AVAILABLE',
             publicProfile: dto.publicProfile ?? false,
@@ -107,11 +203,18 @@ export class ProfessionalProfilesService {
 
   async update(userId: string, dto: UpdateProfessionalProfileDto) {
     const current = await this.requireProfile(userId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
+    if (user) assertIndividualName(user.firstName, user.lastName);
 
     const { data, changes, changed } = diffChanges(current, {
       professionalType: dto.professionalType,
       headline: optionalText(dto.headline),
       bio: optionalText(dto.bio),
+      baseCity: optionalText(dto.baseCity),
+      primaryAccreditation: optionalText(dto.primaryAccreditation),
       yearsExperience: dto.yearsExperience,
       availabilityStatus: dto.availabilityStatus,
       publicProfile: dto.publicProfile,
@@ -256,11 +359,14 @@ export class ProfessionalProfilesService {
     if (!profile) return null;
 
     return {
+      id: profile.id,
       firstName: profile.user.firstName,
       lastName: profile.user.lastName,
       professionalType: profile.professionalType,
       headline: profile.headline,
       bio: profile.bio,
+      baseCity: profile.baseCity,
+      primaryAccreditation: profile.primaryAccreditation,
       yearsExperience: profile.yearsExperience,
       availabilityStatus: profile.availabilityStatus,
       verificationStatus: profile.verificationStatus,
@@ -296,6 +402,8 @@ export class ProfessionalProfilesService {
       professionalType: profile.professionalType,
       headline: profile.headline,
       bio: profile.bio,
+      baseCity: profile.baseCity,
+      primaryAccreditation: profile.primaryAccreditation,
       yearsExperience: profile.yearsExperience,
       availabilityStatus: profile.availabilityStatus,
       verificationStatus: profile.verificationStatus,

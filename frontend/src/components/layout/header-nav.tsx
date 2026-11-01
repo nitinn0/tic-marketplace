@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
+import { isProviderAdmin } from "@/features/organizations/utils/permissions";
 import { routes } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -12,15 +13,19 @@ import { cn } from "@/lib/utils";
 
 export function HeaderNav() {
   const pathname = usePathname() ?? "";
-  const { activeOrganization } = useOrganizations();
+  const { activeOrganization, activeContext } = useOrganizations();
   const dashboardHref =
     activeOrganization?.organizationType === "PROVIDER" ? routes.providerDashboard : routes.dashboard;
+  const showIndependents = isProviderAdmin(activeOrganization, activeContext);
 
   const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const items = [
     { label: "Services", href: routes.services, active: matches(routes.services) },
-    { label: "Providers", href: "/providers", active: matches("/providers") },
+    { label: "Providers", href: routes.providers, active: matches(routes.providers) },
+    ...(showIndependents
+      ? [{ label: "Hire Individuals", href: routes.professionals, active: matches(routes.professionals) }]
+      : []),
     { label: "How it works", href: routes.howItWorks, active: pathname === routes.howItWorks },
     {
       label: "Dashboard",

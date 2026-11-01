@@ -1,10 +1,16 @@
 import { Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
-import type { ProviderProfile, Service, ServiceCategory } from '@prisma/client';
+import type {
+  ProfessionalProfile,
+  ProviderProfile,
+  Service,
+  ServiceCategory,
+} from '@prisma/client';
 import { createReadStream } from 'node:fs';
 import { access } from 'node:fs/promises';
 
 import { absoluteStoragePath } from '../../common/uploads/service-document-storage.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { PUBLIC_PROFESSIONAL_PROFILE_WHERE } from '../professionals/professional-visibility.js';
 import { PUBLIC_PROVIDER_PROFILE_WHERE } from '../providers/provider-visibility.js';
 import { locationLabel } from '../taxonomy/utils/location.util.js';
 import { ancestorsOf, buildTreeIndex, descendantIdsOf, isEffectivelyActive } from '../taxonomy/utils/tree.util.js';
@@ -38,6 +44,10 @@ type PublicProvider = ProviderProfile & {
   organization: { displayName: string; status: string; organizationType: string };
   services: { service: { id: string; name: string; slug: string } }[];
   locations: { location: { countryCode: string; state: string | null; city: string | null; postalCode: string | null } }[];
+};
+
+type PublicProfessional = ProfessionalProfile & {
+  user: { firstName: string; lastName: string; status: string };
 };
 
 @Injectable()
@@ -211,6 +221,27 @@ export class MarketplaceCatalogService {
     };
   }
 
+  /** Public independent professionals that companies can browse to hire. */
+  async listProfessionals() {
+    const professionals = await this.publicProfessionals();
+    return { professionals: professionals.map((row) => this.toProfessionalCard(row)) };
+  }
+
+  async professionalById(id: string) {
+    const professional = await this.prisma.professionalProfile.findFirst({
+      where: { id, ...PUBLIC_PROFESSIONAL_PROFILE_WHERE },
+      include: {
+        user: { select: { firstName: true, lastName: true, status: true } },
+      },
+    });
+    if (!professional) throw new NotFoundException('Professional not found');
+    return {
+      ...this.toProfessionalCard(professional),
+      bio: professional.bio,
+      primaryAccreditation: professional.primaryAccreditation,
+    };
+  }
+
   private popular(services: ServiceRow[]) {
     const bySlug = new Map(services.map((service) => [service.slug, service]));
     const picked = POPULAR_SLUGS.map((slug) => bySlug.get(slug)).filter((service): service is ServiceRow => Boolean(service));
@@ -290,5 +321,35 @@ export class MarketplaceCatalogService {
       },
       locations: { include: { location: true } },
     } as const;
+  }
+
+  private async publicProfessionals() {
+    const professionals = await this.prisma.professionalProfile.findMany({
+      where: PUBLIC_PROFESSIONAL_PROFILE_WHERE,
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { firstName: true, lastName: true, status: true } },
+      },
+    });
+    return professionals.sort(
+      (a, b) => Number(b.verificationStatus === 'VERIFIED') - Number(a.verificationStatus === 'VERIFIED'),
+    );
+  }
+
+  private toProfessionalCard(professional: PublicProfessional) {
+    const name = [professional.user.firstName, professional.user.lastName].filter(Boolean).join(' ').trim();
+    return {
+      id: professional.id,
+      name: name || 'Independent professional',
+      firstName: professional.user.firstName,
+      lastName: professional.user.lastName,
+      headline: professional.headline,
+      professionalType: professional.professionalType,
+      verified: professional.verificationStatus === 'VERIFIED',
+      yearsExperience: professional.yearsExperience,
+      availabilityStatus: professional.availabilityStatus,
+      baseCity: professional.baseCity,
+      primaryAccreditation: professional.primaryAccreditation,
+    };
   }
 }

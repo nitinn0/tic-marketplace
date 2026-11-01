@@ -37,6 +37,21 @@ export type MarketplaceProvider = {
   locations: string[];
 };
 
+export type MarketplaceProfessional = {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  headline: string | null;
+  professionalType: string;
+  verified: boolean;
+  yearsExperience: number | null;
+  availabilityStatus: string;
+  baseCity: string | null;
+  primaryAccreditation: string | null;
+  bio?: string | null;
+};
+
 export type MarketplaceCategory = {
   id: string;
   slug: string;

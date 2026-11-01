@@ -641,17 +641,19 @@ model ProviderLocation {
 
 /// A professional is an individual user; no organization is required.
 model ProfessionalProfile {
-  id                 String                    @id @default(uuid()) @db.Uuid
-  userId             String                    @unique @map("user_id") @db.Uuid
-  professionalType   ProfessionalType          @map("professional_type")
-  headline           String?
-  bio                String?
-  yearsExperience    Int?                      @map("years_experience")
-  availabilityStatus AvailabilityStatus        @default(AVAILABLE) @map("availability_status")
-  verificationStatus ProfileVerificationStatus @default(PENDING) @map("verification_status")
-  publicProfile      Boolean                   @default(false) @map("public_profile")
-  createdAt          DateTime                  @default(now()) @map("created_at")
-  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  id                     String                    @id @default(uuid()) @db.Uuid
+  userId                 String                    @unique @map("user_id") @db.Uuid
+  professionalType       ProfessionalType          @map("professional_type")
+  headline               String?
+  bio                    String?
+  baseCity               String?                   @map("base_city")
+  primaryAccreditation   String?                   @map("primary_accreditation")
+  yearsExperience        Int?                      @map("years_experience")
+  availabilityStatus     AvailabilityStatus        @default(AVAILABLE) @map("availability_status")
+  verificationStatus     ProfileVerificationStatus @default(PENDING) @map("verification_status")
+  publicProfile          Boolean                   @default(false) @map("public_profile")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
 
   user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   experience ProfessionalExperience[]

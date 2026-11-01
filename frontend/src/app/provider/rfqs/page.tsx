@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -9,11 +9,13 @@ import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
 
-export default function ProviderRfqsPage() {
+function ProviderRfqsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedRfqId = searchParams.get("rfq");
   const [rfqs, setRfqs] = useState<ProviderRfq[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(requestedRfqId);
   const [amount, setAmount] = useState("");
   const [scopeNotes, setScopeNotes] = useState("");
   const [exclusions, setExclusions] = useState("");
@@ -31,6 +33,15 @@ export default function ProviderRfqsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!requestedRfqId) return;
+    setActiveId(requestedRfqId);
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`rfq-${requestedRfqId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedRfqId, rfqs.length]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -86,7 +97,13 @@ export default function ProviderRfqsPage() {
           const withdrawn = rfq.quote?.status === "WITHDRAWN";
 
           return (
-            <li key={rfq.id} className="rounded-xl border border-border bg-card p-5">
+            <li
+              id={`rfq-${rfq.id}`}
+              key={rfq.id}
+              className={`rounded-xl border bg-card p-5 ${
+                requestedRfqId === rfq.id ? "border-[#E36F47] ring-2 ring-[#E36F47]/20" : "border-border"
+              }`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs text-muted-foreground">{rfq.service.name}</p>
@@ -238,5 +255,13 @@ export default function ProviderRfqsPage() {
         </p>
       ) : null}
     </div>
+  );
+}
+
+export default function ProviderRfqsPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-12 text-sm text-muted-foreground">Loading RFQs…</div>}>
+      <ProviderRfqsContent />
+    </Suspense>
   );
 }

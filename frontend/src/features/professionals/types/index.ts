@@ -19,9 +19,13 @@ export type ProfessionalExperience = {
 export type ProfessionalProfile = {
   id: string;
   userId: string;
+  firstName?: string;
+  lastName?: string;
   professionalType: ProfessionalType;
   headline: string | null;
   bio: string | null;
+  baseCity: string | null;
+  primaryAccreditation: string | null;
   yearsExperience: number | null;
   availabilityStatus: AvailabilityStatus;
   verificationStatus: ProfileVerificationStatus;
@@ -36,9 +40,32 @@ export type ProfessionalProfileInput = {
   professionalType?: ProfessionalType;
   headline?: string | null;
   bio?: string | null;
+  baseCity?: string | null;
+  primaryAccreditation?: string | null;
   yearsExperience?: number | null;
   availabilityStatus?: AvailabilityStatus;
   publicProfile?: boolean;
+};
+
+export type OnboardProfessionalInput = ProfessionalProfileInput & {
+  firstName: string;
+  lastName: string;
+  professionalType: ProfessionalType;
+};
+
+export type MarketplaceProfessional = {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  headline: string | null;
+  professionalType: ProfessionalType;
+  verified: boolean;
+  yearsExperience: number | null;
+  availabilityStatus: AvailabilityStatus;
+  baseCity: string | null;
+  primaryAccreditation: string | null;
+  bio?: string | null;
 };
 
 export type ExperienceInput = {

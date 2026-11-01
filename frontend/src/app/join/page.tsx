@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Building2, Loader2, LogIn } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,14 @@ import {
 } from "@/features/auth/components/auth-field";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { organizationsService } from "@/features/organizations/services/organizations.service";
+import { professionalsService } from "@/features/professionals/services/professionals.service";
+import type { ProfessionalType } from "@/features/professionals/types";
+import { providersService } from "@/features/providers/services/providers.service";
+import type { ProviderType } from "@/features/providers/types";
+import {
+  COMPANY_CLASSIFICATION_BLOCKED_MESSAGE,
+  containsCompanyClassification,
+} from "@/features/providers/utils/company-classification";
 import { ApiError, api, setActiveOrganizationId, usesSupabaseAuth } from "@/lib/api";
 import { clearSession, getStoredSession, saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
@@ -33,18 +41,59 @@ type RegisterResponse = {
   };
 };
 
-const loginHref = `${routes.login}?next=${encodeURIComponent(routes.providerProfile)}`;
+type JoinKind = "organisation" | "independent";
+
+const JOIN_CATEGORIES = [
+  { id: "testing", label: "Testing", providerType: "TESTING_LAB" as ProviderType, professionalType: "TECHNICAL_EXPERT" as ProfessionalType },
+  { id: "inspection", label: "Inspection", providerType: "INSPECTION_COMPANY" as ProviderType, professionalType: "INSPECTOR" as ProfessionalType },
+  { id: "certification", label: "Certification", providerType: "CERTIFICATION_BODY" as ProviderType, professionalType: "LEAD_AUDITOR" as ProfessionalType },
+  { id: "esg", label: "Sustainability & ESG", providerType: "CONSULTANCY" as ProviderType, professionalType: "CONSULTANT" as ProfessionalType },
+  { id: "professional", label: "Professional Services", providerType: "CONSULTANCY" as ProviderType, professionalType: "CONSULTANT" as ProfessionalType },
+] as const;
+
+const BASE_CITIES = [
+  "Ahmedabad",
+  "Bengaluru",
+  "Chennai",
+  "Delhi NCR",
+  "Hyderabad",
+  "Jaipur",
+  "Kolkata",
+  "Mumbai",
+  "Pune",
+  "Surat",
+  "Other / Remote",
+];
+
+const loginHref = `${routes.login}?next=${encodeURIComponent(routes.join)}`;
+
+function splitFullName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function accountNamesFromOrg(orgName: string, email: string) {
+  const local = email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || "Provider";
+  const first = local.split(/\s+/)[0] || "Provider";
+  const last = orgName.trim().slice(0, 40) || "Account";
+  return { firstName: first.charAt(0).toUpperCase() + first.slice(1), lastName: last };
+}
 
 export default function JoinPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"choose" | "onboard">("choose");
+  const [kind, setKind] = useState<JoinKind>("organisation");
   const [signedIn, setSignedIn] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [legalName, setLegalName] = useState("");
+  const [organisationName, setOrganisationName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [baseCity, setBaseCity] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [headline, setHeadline] = useState("");
+  const [about, setAbout] = useState("");
+  const [accreditation, setAccreditation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -52,19 +101,29 @@ export default function JoinPage() {
     setSignedIn(Boolean(getStoredSession()));
   }, []);
 
-  async function createProviderOrganization() {
-    const organization = await organizationsService.create({
-      legalName: legalName.trim(),
-      displayName: displayName.trim(),
-      organizationType: "PROVIDER",
-    });
-    setActiveOrganizationId(organization.id);
-    await organizationsService.switch(organization.id);
-    router.push(routes.providerProfile);
-    router.refresh();
+  const selectedCategories = useMemo(
+    () => JOIN_CATEGORIES.filter((entry) => categories.includes(entry.id)),
+    [categories],
+  );
+
+  const canSubmit = useMemo(() => {
+    if (!baseCity || categories.length === 0) return false;
+    if (kind === "organisation") {
+      if (organisationName.trim().length < 2) return false;
+    } else if (fullName.trim().length < 3) {
+      return false;
+    }
+    if (!signedIn) {
+      if (!email.trim().includes("@") || password.length < 8) return false;
+    }
+    return true;
+  }, [baseCity, categories.length, email, fullName, kind, organisationName, password, signedIn]);
+
+  function toggleCategory(id: string) {
+    setCategories((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
   }
 
-  async function ensureSession() {
+  async function ensureSession(names: { firstName: string; lastName: string }) {
     const stored = getStoredSession();
     if (usesSupabaseAuth()) {
       const valid = stored ? await supabaseTokenIsValid(stored.accessToken) : false;
@@ -72,28 +131,93 @@ export default function JoinPage() {
       if (!email.trim() || !password) {
         clearSession();
         setSignedIn(false);
-        throw new Error("Enter your email and password, then create the provider organization again.");
+        throw new Error("Enter your email and password, then submit again.");
       }
       const authData = await signUpWithEmail({
         email: email.trim(),
         password,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: names.firstName,
+        lastName: names.lastName,
       });
-      saveSession(sessionFromSupabaseAuth(authData, { email, firstName, lastName }));
+      saveSession(sessionFromSupabaseAuth(authData, { email, firstName: names.firstName, lastName: names.lastName }));
       setSignedIn(true);
       return;
     }
 
     if (stored) return;
     const result = await api.post<RegisterResponse>("/auth/register", {
-      firstName,
-      lastName,
-      email,
+      firstName: names.firstName,
+      lastName: names.lastName,
+      email: email.trim(),
       password,
     });
     saveSession(result);
     setSignedIn(true);
+  }
+
+  async function submitOrganisation() {
+    const names = accountNamesFromOrg(organisationName, email);
+    await ensureSession(names);
+
+    const organization = await organizationsService.create({
+      legalName: organisationName.trim(),
+      displayName: organisationName.trim(),
+      organizationType: "PROVIDER",
+      description: [about.trim(), accreditation.trim() ? `Primary accreditation: ${accreditation.trim()}` : "", baseCity ? `Base city: ${baseCity}` : ""]
+        .filter(Boolean)
+        .join("\n\n"),
+      countryCode: "IN",
+    });
+    setActiveOrganizationId(organization.id);
+    await organizationsService.switch(organization.id);
+
+    const providerTypes = Array.from(new Set(selectedCategories.map((entry) => entry.providerType)));
+    try {
+      await providersService.createProfile(organization.id, {
+        providerTypes: providerTypes.length ? providerTypes : ["OTHER"],
+        headline: headline.trim() || null,
+        description: about.trim() || null,
+        publicProfile: true,
+      });
+    } catch (err) {
+      // Profile may already exist if the org was partially onboarded; continue to the profile page.
+      if (!(err instanceof ApiError && err.status === 409)) throw err;
+    }
+
+    router.push(routes.providerProfile);
+    router.refresh();
+  }
+
+  async function submitIndependent() {
+    if (containsCompanyClassification(fullName)) {
+      throw new Error(COMPANY_CLASSIFICATION_BLOCKED_MESSAGE);
+    }
+
+    const names = splitFullName(fullName);
+    if (names.firstName.length < 2 || names.lastName.length < 2) {
+      throw new Error("Enter your full personal name (first and last name).");
+    }
+    if (containsCompanyClassification(`${names.firstName} ${names.lastName}`)) {
+      throw new Error(COMPANY_CLASSIFICATION_BLOCKED_MESSAGE);
+    }
+
+    await ensureSession(names);
+
+    const professionalType = selectedCategories[0]?.professionalType ?? "OTHER";
+    await professionalsService.onboard({
+      firstName: names.firstName,
+      lastName: names.lastName,
+      professionalType,
+      headline: headline.trim() || null,
+      bio: about.trim() || null,
+      baseCity: baseCity || null,
+      primaryAccreditation: accreditation.trim() || null,
+      publicProfile: true,
+      availabilityStatus: "AVAILABLE",
+    });
+
+    router.push(routes.professionalProfile);
+    router.refresh();
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -101,15 +225,15 @@ export default function JoinPage() {
     setLoading(true);
     setError(null);
     try {
-      await ensureSession();
-      await createProviderOrganization();
+      if (kind === "organisation") await submitOrganisation();
+      else await submitIndependent();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
         setSignedIn(false);
         setError("Your session is not valid for this site. Enter your email and password, then try again.");
       } else {
-        setError(err instanceof Error ? err.message : "Unable to start provider onboarding.");
+        setError(err instanceof Error ? err.message : "Unable to submit for verification.");
       }
     } finally {
       setLoading(false);
@@ -120,171 +244,217 @@ export default function JoinPage() {
     <AuthShell
       eyebrow="Provider onboarding"
       title="Join as a provider"
-      description="List your lab, inspection company, certification body, or consulting practice and receive matching RFQs."
+      description="Labs, certification bodies, inspectors, consultants, auditors and independent experts."
       highlights={[
-        "Post the services buyers already search for",
-        "Receive RFQs matched to your capabilities",
-        "Quote with buyer identity masked until you engage",
+        "List as an organisation or an independent professional",
+        "Individuals must use a personal name — no PVT LTD / LLP profiles",
+        "Companies can browse independents to hire them",
       ]}
     >
       <div className="auth-rise">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Providers</p>
-        <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">
-          {step === "choose" ? "How do you want to start?" : "Create your provider organization"}
-        </h2>
+        <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">Join as a provider</h2>
         <p className="mt-2 text-sm text-slate-600">
-          {step === "choose"
-            ? "New providers onboard here. Existing accounts can sign in and continue to the provider profile."
-            : signedIn
-              ? "You're signed in. Add the business buyers will see on the marketplace."
-              : "Create your account and provider organization in one step."}
+          Labs, certification bodies, inspectors, consultants, auditors and independent experts.
         </p>
 
-        {step === "choose" ? (
-          <div className="mt-8 grid gap-3">
-            <button
-              type="button"
-              onClick={() => setStep("onboard")}
-              className={cn(
-                "group flex w-full items-start gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition",
-                "hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-500/15",
-              )}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                <Building2 className="h-5 w-5" aria-hidden />
-              </span>
-              <span>
-                <span className="block font-semibold text-slate-900 group-hover:text-sky-800">Onboard as a new provider</span>
-                <span className="mt-1 block text-sm text-slate-500">Create an account and list your organization.</span>
-              </span>
-            </button>
-
-            <Link
-              href={loginHref}
-              className={cn(
-                "group flex w-full items-start gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition",
-                "hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-500/15",
-              )}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                <LogIn className="h-5 w-5" aria-hidden />
-              </span>
-              <span>
-                <span className="block font-semibold text-slate-900 group-hover:text-sky-800">I already have an account</span>
-                <span className="mt-1 block text-sm text-slate-500">Sign in, then finish your provider profile.</span>
-              </span>
-            </Link>
-          </div>
-        ) : (
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit} noValidate>
-            {signedIn ? null : (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <AuthField label="First name" htmlFor="firstName">
-                    <AuthInput
-                      id="firstName"
-                      required
-                      minLength={2}
-                      autoComplete="given-name"
-                      autoFocus
-                      value={firstName}
-                      onChange={(event) => setFirstName(event.target.value)}
-                    />
-                  </AuthField>
-                  <AuthField label="Last name" htmlFor="lastName">
-                    <AuthInput
-                      id="lastName"
-                      required
-                      minLength={2}
-                      autoComplete="family-name"
-                      value={lastName}
-                      onChange={(event) => setLastName(event.target.value)}
-                    />
-                  </AuthField>
-                </div>
-                <AuthField label="Work email" htmlFor="email">
-                  <AuthInput
-                    id="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="Enter your email"
-                  />
-                </AuthField>
-                <AuthField label="Password" htmlFor="password" hint="At least 8 characters.">
-                  <AuthPasswordInput
-                    id="password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Create a password"
-                  />
-                  <PasswordStrengthMeter password={password} />
-                </AuthField>
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Organization</p>
-                </div>
-              </>
-            )}
-
-            <AuthField label="Business name" htmlFor="displayName" hint="Shown to buyers on the marketplace.">
-              <AuthInput
-                id="displayName"
-                required
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Name buyers will see"
-                autoFocus={signedIn}
-              />
-            </AuthField>
-            <AuthField label="Legal name" htmlFor="legalName" hint="Registered company name.">
-              <AuthInput
-                id="legalName"
-                required
-                value={legalName}
-                onChange={(event) => setLegalName(event.target.value)}
-                placeholder="Registered company name"
-              />
-            </AuthField>
-
-            {error ? (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+        <div className="mt-6 grid grid-cols-2 gap-2" role="tablist" aria-label="Provider type">
+          {(
+            [
+              { id: "organisation", label: "Organisation" },
+              { id: "independent", label: "Independent professional" },
+            ] as const
+          ).map((option) => {
+            const active = kind === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setKind(option.id);
+                  setError(null);
+                }}
+                className={cn(
+                  "rounded-xl border px-3 py-3 text-sm font-semibold transition",
+                  active
+                    ? "border-[#0F4C5C] bg-[#E8F4F5] text-[#0F4C5C]"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
+                )}
               >
-                {error}
-              </div>
-            ) : null}
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
 
-            <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Creating provider…
-                </>
-              ) : (
-                "Create provider account"
-              )}
-            </Button>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-slate-900"
-              onClick={() => {
-                setError(null);
-                setStep("choose");
-              }}
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
+          {kind === "organisation" ? (
+            <AuthField label="Organisation name" htmlFor="organisationName">
+              <AuthInput
+                id="organisationName"
+                required
+                value={organisationName}
+                onChange={(event) => setOrganisationName(event.target.value)}
+                placeholder="Organisation name"
+                autoFocus
+              />
+            </AuthField>
+          ) : (
+            <AuthField
+              label="Full name"
+              htmlFor="fullName"
+              hint="Personal name only — company classifications like PVT LTD or LLP are blocked."
             >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-              Back
-            </button>
-          </form>
-        )}
+              <AuthInput
+                id="fullName"
+                required
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Your full name"
+                autoFocus
+              />
+            </AuthField>
+          )}
+
+          {signedIn ? null : (
+            <>
+              <AuthField label="Work email" htmlFor="email">
+                <AuthInput
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="Work email"
+                />
+              </AuthField>
+              <AuthField label="Password" htmlFor="password" hint="At least 8 characters to create your account.">
+                <AuthPasswordInput
+                  id="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Create a password"
+                />
+                <PasswordStrengthMeter password={password} />
+              </AuthField>
+            </>
+          )}
+
+          <AuthField label="Base city" htmlFor="baseCity">
+            <select
+              id="baseCity"
+              required
+              value={baseCity}
+              onChange={(event) => setBaseCity(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+            >
+              <option value="">Select base city</option>
+              {BASE_CITIES.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </AuthField>
+
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Categories</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
+              {JOIN_CATEGORIES.map((category) => {
+                const active = categories.includes(category.id);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleCategory(category.id)}
+                    className={cn(
+                      "rounded-full border px-3.5 py-1.5 text-sm font-medium transition",
+                      active
+                        ? "border-[#0F4C5C] bg-[#E8F4F5] text-[#0F4C5C]"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
+                    )}
+                  >
+                    {category.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <AuthField label="Headline" htmlFor="headline">
+            <AuthInput
+              id="headline"
+              maxLength={160}
+              value={headline}
+              onChange={(event) => setHeadline(event.target.value)}
+              placeholder="Headline — what you do, for whom, where"
+            />
+          </AuthField>
+
+          <AuthField
+            label={kind === "organisation" ? "About your organisation / experience" : "About"}
+            htmlFor="about"
+          >
+            <textarea
+              id="about"
+              rows={4}
+              maxLength={5000}
+              value={about}
+              onChange={(event) => setAbout(event.target.value)}
+              placeholder="About your organisation / experience"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+            />
+          </AuthField>
+
+          <AuthField label="Primary accreditation" htmlFor="accreditation">
+            <AuthInput
+              id="accreditation"
+              maxLength={200}
+              value={accreditation}
+              onChange={(event) => setAccreditation(event.target.value)}
+              placeholder="Primary accreditation (e.g. NABL TC-1234, IRCA Lead Auditor)"
+            />
+          </AuthField>
+
+          {error ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          ) : null}
+
+          <Button
+            type="submit"
+            className="h-11 bg-[#0F4C5C] text-sm font-semibold text-white hover:bg-[#0B3B47]"
+            disabled={loading || !canSubmit}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Submitting…
+              </>
+            ) : (
+              "Submit for verification"
+            )}
+          </Button>
+
+          <p className="text-center text-sm text-slate-600">
+            Already have an account?{" "}
+            <Link href={loginHref} className="font-semibold text-[#0F4C5C] transition hover:text-[#0B3B47]">
+              Sign in
+            </Link>
+          </p>
+        </form>
       </div>
     </AuthShell>
   );

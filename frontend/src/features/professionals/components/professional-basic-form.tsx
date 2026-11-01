@@ -24,6 +24,8 @@ export function ProfessionalBasicForm({
     professionalType: profile?.professionalType ?? ("CONSULTANT" as ProfessionalType),
     headline: profile?.headline ?? "",
     bio: profile?.bio ?? "",
+    baseCity: profile?.baseCity ?? "",
+    primaryAccreditation: profile?.primaryAccreditation ?? "",
     yearsExperience: profile?.yearsExperience?.toString() ?? "",
     availabilityStatus: profile?.availabilityStatus ?? ("AVAILABLE" as AvailabilityStatus),
     publicProfile: profile?.publicProfile ?? false,
@@ -43,6 +45,8 @@ export function ProfessionalBasicForm({
         professionalType: form.professionalType,
         headline: form.headline.trim(),
         bio: form.bio.trim(),
+        baseCity: form.baseCity.trim() || null,
+        primaryAccreditation: form.primaryAccreditation.trim() || null,
         yearsExperience: form.yearsExperience.trim() ? Number(form.yearsExperience) : null,
         publicProfile: form.publicProfile,
       };
@@ -84,6 +88,18 @@ export function ProfessionalBasicForm({
       <Field label="Headline" htmlFor="professional-headline" className="md:col-span-2">
         <Input id="professional-headline" maxLength={160} value={form.headline} onChange={(event) => update("headline", event.target.value)} />
       </Field>
+      <Field label="Base city" htmlFor="professional-city">
+        <Input id="professional-city" maxLength={120} value={form.baseCity} onChange={(event) => update("baseCity", event.target.value)} />
+      </Field>
+      <Field label="Primary accreditation" htmlFor="professional-accreditation">
+        <Input
+          id="professional-accreditation"
+          maxLength={200}
+          value={form.primaryAccreditation}
+          onChange={(event) => update("primaryAccreditation", event.target.value)}
+          placeholder="e.g. NABL TC-1234, IRCA Lead Auditor"
+        />
+      </Field>
       <Field label="Bio" htmlFor="professional-bio" className="md:col-span-2">
         <Textarea id="professional-bio" maxLength={5000} className="min-h-32" value={form.bio} onChange={(event) => update("bio", event.target.value)} />
       </Field>
@@ -105,7 +121,7 @@ export function ProfessionalBasicForm({
       <div className="md:col-span-2">
         <Checkbox
           id="professional-public"
-          label="Show this profile publicly once marketplace listings are available"
+          label="Show this profile publicly so companies can find and hire you"
           checked={form.publicProfile}
           onChange={(checked) => update("publicProfile", checked)}
         />

@@ -47,4 +47,14 @@ export class MarketplaceController {
   provider(@Param('id') id: string) {
     return this.catalog.providerById(id);
   }
+
+  @Get('professionals')
+  professionals() {
+    return this.catalog.listProfessionals();
+  }
+
+  @Get('professionals/:id')
+  professional(@Param('id', ParseUUIDPipe) id: string) {
+    return this.catalog.professionalById(id);
+  }
 }

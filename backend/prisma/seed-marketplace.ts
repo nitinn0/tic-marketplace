@@ -275,12 +275,19 @@ export async function seedDemoMarketplaceProfiles(prisma: PrismaClient) {
 
   const arjunProfile = await prisma.professionalProfile.upsert({
     where: { userId: arjun.id },
-    update: {},
+    update: {
+      publicProfile: true,
+      baseCity: 'Mumbai',
+      primaryAccreditation: 'IRCA Lead Auditor',
+      headline: 'ISO lead auditor for manufacturing and supply chains',
+    },
     create: {
       userId: arjun.id,
       professionalType: 'LEAD_AUDITOR',
-      headline: 'ISO 9001 / ISO 14001 lead auditor',
+      headline: 'ISO lead auditor for manufacturing and supply chains',
       bio: 'Lead auditor for quality and environmental management systems across manufacturing.',
+      baseCity: 'Mumbai',
+      primaryAccreditation: 'IRCA Lead Auditor',
       yearsExperience: 9,
       availabilityStatus: 'PARTIALLY_AVAILABLE',
       publicProfile: true,

@@ -1,11 +1,18 @@
 import { api } from "@/lib/api";
 
-import type { ExperienceInput, ProfessionalExperience, ProfessionalProfile, ProfessionalProfileInput } from "../types";
+import type {
+  ExperienceInput,
+  OnboardProfessionalInput,
+  ProfessionalExperience,
+  ProfessionalProfile,
+  ProfessionalProfileInput,
+} from "../types";
 
 const experience = (id: string) => `/professional/experience/${encodeURIComponent(id)}`;
 
 /** The caller's own professional profile; the backend keys everything by the signed-in user. */
 export const professionalsService = {
+  onboard: (input: OnboardProfessionalInput) => api.post<ProfessionalProfile>("/professional/onboard", input),
   getProfile: () => api.get<ProfessionalProfile>("/professional/profile"),
   createProfile: (input: ProfessionalProfileInput) => api.post<ProfessionalProfile>("/professional/profile", input),
   updateProfile: (input: ProfessionalProfileInput) => api.patch<ProfessionalProfile>("/professional/profile", input),

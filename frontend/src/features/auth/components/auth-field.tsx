@@ -6,7 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-xl border border-[#EADFCF] bg-white px-3.5 py-3 text-sm text-[#12303A] outline-none transition placeholder:text-[#6B7B80] focus:border-[#7CC0C8] focus:bg-white focus:ring-4 focus:ring-[#1B7F8C]/15 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function AuthField({
   label,
@@ -25,7 +25,7 @@ export function AuthField({
 }) {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-[#3E5258]">
         {label}
       </label>
       {children}
@@ -34,7 +34,7 @@ export function AuthField({
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-slate-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-[#6B7B80]">{hint}</p>
       ) : null}
     </div>
   );

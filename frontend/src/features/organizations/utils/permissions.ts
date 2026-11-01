@@ -1,4 +1,21 @@
-import type { AccessVia, OrganizationStatus, PermissionAction, PermissionEntry } from "../types";
+import type {
+  AccessVia,
+  OrganizationContext,
+  OrganizationStatus,
+  PermissionAction,
+  PermissionEntry,
+  UserOrganization,
+} from "../types";
+
+/** True when the active org is a PROVIDER and the caller holds PROVIDER_ADMIN there. */
+export function isProviderAdmin(
+  organization: Pick<UserOrganization, "organizationType" | "roles"> | null | undefined,
+  context?: Pick<OrganizationContext, "roles"> | null,
+) {
+  if (!organization || organization.organizationType !== "PROVIDER") return false;
+  const roles = context?.roles?.length ? context.roles : organization.roles;
+  return roles.some((role) => role.code === "PROVIDER_ADMIN");
+}
 
 /** Mirrors backend ORGANIZATION_FUNCTIONALITIES. */
 export const ORGANIZATION_FUNCTIONALITIES = {

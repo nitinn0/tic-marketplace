@@ -143,6 +143,10 @@ function ProfessionalProfileDetails({
             <dd className="text-slate-900">{professionalTypeLabels[profile.professionalType]}</dd>
             <dt className="text-slate-500">Headline</dt>
             <dd className="text-slate-900">{profile.headline || "—"}</dd>
+            <dt className="text-slate-500">Base city</dt>
+            <dd className="text-slate-900">{profile.baseCity || "—"}</dd>
+            <dt className="text-slate-500">Primary accreditation</dt>
+            <dd className="text-slate-900">{profile.primaryAccreditation || "—"}</dd>
             <dt className="text-slate-500">Bio</dt>
             <dd className="whitespace-pre-line text-slate-900">{profile.bio || "—"}</dd>
             <dt className="text-slate-500">Years of experience</dt>

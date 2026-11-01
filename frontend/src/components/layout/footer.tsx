@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
+import { isProviderAdmin } from "@/features/organizations/utils/permissions";
 import { appName, routes } from "@/lib/constants";
 
 /* Palette: Terracotta + Deep Teal
@@ -28,6 +32,8 @@ function ColumnHeading({ children }: { children: ReactNode }) {
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const { activeOrganization, activeContext } = useOrganizations();
+  const showIndependents = isProviderAdmin(activeOrganization, activeContext);
 
   return (
     <footer className="relative overflow-hidden bg-[#0B3440] text-white">
@@ -74,7 +80,10 @@ export function Footer() {
           <ul className="mt-4 space-y-2.5 text-sm">
             <li><FooterLink href={routes.home}>Overview</FooterLink></li>
             <li><FooterLink href={routes.howItWorks}>How it works</FooterLink></li>
-            <li><FooterLink href="/providers">Providers</FooterLink></li>
+            <li><FooterLink href={routes.providers}>Providers</FooterLink></li>
+            {showIndependents ? (
+              <li><FooterLink href={routes.professionals}>Independents</FooterLink></li>
+            ) : null}
             <li><FooterLink href={routes.dashboard}>Dashboard</FooterLink></li>
           </ul>
         </nav>

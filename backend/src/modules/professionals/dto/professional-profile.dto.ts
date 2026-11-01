@@ -1,5 +1,5 @@
 import { AvailabilityStatus, ProfessionalType } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
 
 import { OptionalNotNull, Squish, Trim, TrimUpper } from '../../../common/dto/transforms.js';
 
@@ -20,6 +20,18 @@ export class CreateProfessionalProfileDto {
   @IsString()
   @MaxLength(5000)
   bio?: string | null;
+
+  @IsOptional()
+  @Squish()
+  @IsString()
+  @MaxLength(120)
+  baseCity?: string | null;
+
+  @IsOptional()
+  @Squish()
+  @IsString()
+  @MaxLength(200)
+  primaryAccreditation?: string | null;
 
   @IsOptional()
   @IsInt()
@@ -56,6 +68,18 @@ export class UpdateProfessionalProfileDto {
   bio?: string | null;
 
   @IsOptional()
+  @Squish()
+  @IsString()
+  @MaxLength(120)
+  baseCity?: string | null;
+
+  @IsOptional()
+  @Squish()
+  @IsString()
+  @MaxLength(200)
+  primaryAccreditation?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(80)
@@ -69,4 +93,17 @@ export class UpdateProfessionalProfileDto {
   @OptionalNotNull()
   @IsBoolean()
   publicProfile?: boolean;
+}
+
+/** Self-serve join for independents: grants PROFESSIONAL role and creates the profile. */
+export class OnboardProfessionalDto extends CreateProfessionalProfileDto {
+  @Trim()
+  @IsString()
+  @Length(2, 80)
+  firstName: string;
+
+  @Trim()
+  @IsString()
+  @Length(2, 80)
+  lastName: string;
 }

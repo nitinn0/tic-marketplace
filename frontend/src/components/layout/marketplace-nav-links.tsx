@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheck, ClipboardList, FlaskConical, Tags, UserRound } from "lucide-react";
+import { BadgeCheck, ClipboardList, FlaskConical, MessageSquare, Tags, UserRound } from "lucide-react";
 
 import { routes } from "@/lib/constants";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
@@ -11,6 +11,7 @@ import {
   ORGANIZATION_FUNCTIONALITIES,
   PROFESSIONAL_FUNCTIONALITIES,
   PROVIDER_FUNCTIONALITIES,
+  RFQ_FUNCTIONALITIES,
 } from "@/features/organizations/utils/permissions";
 
 const linkClass = "transition hover:text-sky-700";
@@ -30,10 +31,21 @@ export function MarketplaceNavLinks({ menu = false, onNavigate }: { menu?: boole
     activeOrganization?.organizationType === "PROVIDER" &&
     hasPermission(activeContext?.permissions, PROVIDER_FUNCTIONALITIES.profile, "view");
   const canViewProfessional = hasPermission(me.permissions, PROFESSIONAL_FUNCTIONALITIES.profile, "view");
+  const canMessage =
+    (activeOrganization?.organizationType === "BUYER" &&
+      hasPermission(activeContext?.permissions, RFQ_FUNCTIONALITIES.buyer, "view")) ||
+    (activeOrganization?.organizationType === "PROVIDER" &&
+      hasPermission(activeContext?.permissions, RFQ_FUNCTIONALITIES.provider, "view"));
 
   if (menu) {
     return (
       <>
+        {canMessage ? (
+          <Link href={routes.messages} role="menuitem" className={menuClass} onClick={onNavigate}>
+            <MessageSquare className="h-4 w-4 text-slate-500" />
+            Messages
+          </Link>
+        ) : null}
         {canViewProvider ? (
           <Link href={routes.providerProfile} role="menuitem" className={menuClass} onClick={onNavigate}>
             <UserRound className="h-4 w-4 text-slate-500" />
@@ -70,6 +82,11 @@ export function MarketplaceNavLinks({ menu = false, onNavigate }: { menu?: boole
 
   return (
     <>
+      {canMessage ? (
+        <Link href={routes.messages} className={linkClass}>
+          Messages
+        </Link>
+      ) : null}
       {canViewProvider ? (
         <Link href={routes.providerProfile} className={linkClass}>
           Provider profile

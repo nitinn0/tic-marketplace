@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ApiConfigScript } from "@/components/layout/api-config-script";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { ChatLauncher } from "@/features/messaging/components/chat-launcher";
 import { OrganizationProvider } from "@/features/organizations/components/organization-provider";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
+          <ChatLauncher />
         </OrganizationProvider>
       </body>
     </html>

@@ -193,6 +193,7 @@ export default function ProviderDashboardPage() {
             <ProviderServicesPanel
               organizationId={organizationId}
               profile={profile}
+              onCreateProfile={() => setPanel("overview")}
               onChanged={async () => {
                 const saved = await providersService.getProfile(organizationId);
                 setProfile(saved);

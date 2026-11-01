@@ -1,13 +1,16 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { routes } from "@/lib/constants";
 import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
 
 export default function ProviderRfqsPage() {
+  const router = useRouter();
   const [rfqs, setRfqs] = useState<ProviderRfq[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -130,9 +133,32 @@ export default function ProviderRfqsPage() {
               {awarded ? (
                 <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-medium text-slate-900">You won this RFQ</p>
-                  <p className="mt-1 text-sm text-slate-600">Buyer messaging and payment will open here in a later release.</p>
-                  <Button type="button" variant="outline" className="mt-3" disabled>
-                    Messages coming soon
+                  <p className="mt-1 text-sm text-slate-600">
+                    Message the buyer to coordinate next steps. Phone numbers and emails are blocked in chat.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3"
+                    disabled={busyId === `chat-${rfq.id}`}
+                    onClick={() => {
+                      if (rfq.conversationId) {
+                        router.push(routes.message(rfq.conversationId));
+                        return;
+                      }
+                      setBusyId(`chat-${rfq.id}`);
+                      void api
+                        .get<{ id: string }>(`/provider/rfqs/${rfq.id}/conversation`)
+                        .then((data) => {
+                          router.push(routes.message(data.id));
+                        })
+                        .catch((err: unknown) => {
+                          setError(err instanceof Error ? err.message : "Could not open chat");
+                          setBusyId(null);
+                        });
+                    }}
+                  >
+                    {busyId === `chat-${rfq.id}` ? "Opening…" : "Open messages"}
                   </Button>
                 </div>
               ) : null}

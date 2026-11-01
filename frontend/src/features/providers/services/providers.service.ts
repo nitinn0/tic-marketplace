@@ -25,8 +25,19 @@ export const providersService = {
     api.patch<ProviderProfile>("/provider/profile", input, scoped(organizationId)),
   catalog: (organizationId: string) => api.get<ProviderCatalog>("/provider/catalog", scoped(organizationId)),
 
-  publishService: (organizationId: string, input: { categoryId: string; name: string; description?: string }) =>
-    api.post<ProviderServiceItem[]>("/provider/profile/services/publish", input, scoped(organizationId)),
+  publishService: (
+    organizationId: string,
+    input: { categoryId: string; name: string; description?: string; documents: File[] },
+  ) => {
+    const form = new FormData();
+    form.append("categoryId", input.categoryId);
+    form.append("name", input.name);
+    if (input.description) form.append("description", input.description);
+    for (const file of input.documents) {
+      form.append("documents", file);
+    }
+    return api.postForm<ProviderServiceItem[]>("/provider/profile/services/publish", form, scoped(organizationId));
+  },
   replaceServices: (organizationId: string, serviceIds: string[]) =>
     api.put<ProviderServiceItem[]>("/provider/profile/services", { serviceIds }, scoped(organizationId)),
   removeService: (organizationId: string, serviceId: string) =>

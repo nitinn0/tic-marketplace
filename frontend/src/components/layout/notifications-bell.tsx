@@ -21,6 +21,7 @@ type NotificationItem = {
 };
 
 function hrefFor(item: NotificationItem) {
+  if (item.entityType === "conversation" && item.entityId) return routes.message(item.entityId);
   if (item.entityType === "rfq" && item.entityId) return routes.rfq(item.entityId);
   if (item.entityType === "provider" && item.entityId) return routes.provider(item.entityId);
   return routes.dashboard;
@@ -30,14 +31,18 @@ export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
+  // Defer auth UI until after mount so SSR HTML matches the first client paint.
+  const [signedIn, setSignedIn] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     if (!isAuthenticated()) {
+      setSignedIn(false);
       setItems([]);
       setUnread(0);
       return;
     }
+    setSignedIn(true);
     api
       .get<{ unreadCount: number; notifications: NotificationItem[] }>("/notifications")
       .then((data) => {
@@ -65,7 +70,7 @@ export function NotificationsBell() {
     return () => document.removeEventListener("mousedown", onPointer);
   }, [open]);
 
-  if (!isAuthenticated()) return null;
+  if (!signedIn) return null;
 
   return (
     <div ref={root} className="relative">

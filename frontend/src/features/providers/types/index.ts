@@ -7,12 +7,21 @@ export type ProfileVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
 type Assigned = { active: boolean; effectiveActive: boolean; assignedAt: string };
 
+export type ProviderServiceDocument = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+};
+
 export type ProviderServiceItem = Assigned & {
   id: string;
   name: string;
   slug: string;
   category: { id: string; name: string; categoryType: CategoryType } | null;
   categoryPath: string[];
+  documents?: ProviderServiceDocument[];
 };
 
 export type ProviderStandardItem = Assigned & {

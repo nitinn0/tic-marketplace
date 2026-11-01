@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,10 +11,18 @@ import {
   Patch,
   Post,
   Put,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import {
+  SERVICE_DOCUMENT_MAX_BYTES,
+  SERVICE_DOCUMENT_MAX_COUNT,
+} from '../../common/uploads/service-document-storage.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { PROVIDER_FUNCTIONALITIES as P } from '../rbac/constants/permission.constants.js';
 import { CurrentOrganization, OrganizationScoped } from '../rbac/decorators/organization-scoped.decorator.js';
@@ -103,12 +112,33 @@ export class ProviderController {
   @Post('profile/services/publish')
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission(P.services, 'edit')
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'documents', maxCount: SERVICE_DOCUMENT_MAX_COUNT }], {
+      storage: memoryStorage(),
+      limits: { fileSize: SERVICE_DOCUMENT_MAX_BYTES, files: SERVICE_DOCUMENT_MAX_COUNT },
+    }),
+  )
   publishService(
     @CurrentOrganization() context: OrganizationAccessContext,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: PublishProviderServiceDto,
+    @UploadedFiles() files: { documents?: Express.Multer.File[] },
   ) {
-    return this.capabilities.publish(context.organization.id, user.sub, dto);
+    const documents = files?.documents ?? [];
+    if (documents.length === 0) {
+      throw new BadRequestException('At least one supporting document is required');
+    }
+    return this.capabilities.publish(
+      context.organization.id,
+      user.sub,
+      dto,
+      documents.map((file) => ({
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        buffer: file.buffer,
+      })),
+    );
   }
 
   @Post('profile/services')

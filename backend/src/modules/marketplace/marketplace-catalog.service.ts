@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
 import type { ProviderProfile, Service, ServiceCategory } from '@prisma/client';
+import { createReadStream } from 'node:fs';
+import { access } from 'node:fs/promises';
 
+import { absoluteStoragePath } from '../../common/uploads/service-document-storage.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { PUBLIC_PROVIDER_PROFILE_WHERE } from '../providers/provider-visibility.js';
 import { locationLabel } from '../taxonomy/utils/location.util.js';
@@ -101,7 +104,7 @@ export class MarketplaceCatalogService {
     };
   }
 
-  async serviceBySlug(slug: string) {
+  async serviceBySlug(slug: string, includeDocuments: boolean) {
     const [categories, services, providers] = await Promise.all([
       this.prisma.serviceCategory.findMany(),
       this.activeServices(),
@@ -113,11 +116,80 @@ export class MarketplaceCatalogService {
       throw new NotFoundException('Service not found');
     }
     const offering = providers.filter((provider) => provider.services.some((row) => row.service.id === service.id));
+    if (includeDocuments) {
+      return {
+        ...this.toServiceCard(service, index),
+        description: service.description,
+        providers: offering.map((provider) => this.toProviderCard(provider)),
+        documents: await this.documentsForService(service.id),
+      };
+    }
     return {
       ...this.toServiceCard(service, index),
       description: service.description,
       providers: offering.map((provider) => this.toProviderCard(provider)),
+      documentsAvailable: (await this.documentCountForService(service.id)) > 0,
     };
+  }
+
+  async openDocument(documentId: string) {
+    const document = await this.prisma.providerServiceDocument.findFirst({
+      where: {
+        id: documentId,
+        providerService: { provider: PUBLIC_PROVIDER_PROFILE_WHERE, service: { active: true } },
+      },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+
+    const filePath = absoluteStoragePath(document.storageKey);
+    try {
+      await access(filePath);
+    } catch {
+      throw new NotFoundException('Document file is missing');
+    }
+
+    const stream = createReadStream(filePath);
+    return {
+      file: new StreamableFile(stream, {
+        type: document.mimeType,
+        disposition: `attachment; filename="${document.originalName.replace(/"/g, '')}"`,
+        length: document.sizeBytes,
+      }),
+      originalName: document.originalName,
+      mimeType: document.mimeType,
+    };
+  }
+
+  private async documentsForService(serviceId: string) {
+    const rows = await this.prisma.providerServiceDocument.findMany({
+      where: {
+        serviceId,
+        providerService: { provider: PUBLIC_PROVIDER_PROFILE_WHERE },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        providerService: {
+          include: { provider: { include: { organization: { select: { displayName: true } } } } },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      originalName: row.originalName,
+      mimeType: row.mimeType,
+      sizeBytes: row.sizeBytes,
+      createdAt: row.createdAt,
+      providerName: row.providerService.provider.organization.displayName,
+    }));
+  }
+
+  private documentCountForService(serviceId: string) {
+    return this.prisma.providerServiceDocument.count({
+      where: {
+        serviceId,
+        providerService: { provider: PUBLIC_PROVIDER_PROFILE_WHERE },
+      },
+    });
   }
 
   async listProviders() {

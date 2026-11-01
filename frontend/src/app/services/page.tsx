@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, ChevronRight, SearchX } from "lucide-react";
 
 import { SearchBar, ServiceCard } from "@/components/site";
+import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 import type { MarketplaceService } from "@/features/marketplace/types";
@@ -51,6 +52,8 @@ function ServicesResults() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
   const category = params.get("category") ?? "";
+  const { activeOrganization } = useOrganizations();
+  const isProvider = activeOrganization?.organizationType === "PROVIDER";
   const [services, setServices] = useState<MarketplaceService[]>([]);
   const [categoryName, setCategoryName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -190,10 +193,10 @@ function ServicesResults() {
                   Clear filters
                 </Link>
                 <Link
-                  href="/rfq/new"
+                  href={isProvider ? routes.providerRfqs : "/rfq/new"}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#E36F47] px-4 py-2.5 text-sm font-semibold text-[#0B2530] shadow-[0_12px_30px_-12px_rgba(227,111,71,0.9)] transition hover:-translate-y-0.5 hover:bg-[#F2A98B]"
                 >
-                  Request Quote <ArrowRight className="h-4 w-4" aria-hidden />
+                  {isProvider ? "Submit quote" : "Request Quote"} <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               </div>
             </div>

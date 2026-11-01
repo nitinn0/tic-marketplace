@@ -1,7 +1,7 @@
+import { scrubContactInfo } from '../../common/moderation/contact-info.js';
+
 export const MAX_MATCHED_PROVIDERS = 5;
 
-const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const PHONE = /(?:\+?\d[\d\s().-]{7,}\d)/g;
 const STOP_WORDS = new Set(["and", "the", "for", "with", "from", "near", "area"]);
 
 export type MatchInput = {
@@ -63,7 +63,7 @@ export function locationMatches(requested: string, labels: string[]) {
 
 /** Strip emails and phone numbers a buyer may have typed into free text. */
 export function scrubBuyerIdentity(text: string) {
-  return text.replace(EMAIL, "[hidden]").replace(PHONE, "[hidden]");
+  return scrubContactInfo(text);
 }
 
 export function asReasonList(value: unknown): string[] {

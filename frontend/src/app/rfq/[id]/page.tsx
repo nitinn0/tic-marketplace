@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -11,6 +11,7 @@ import { formatMoney, type BuyerRfq } from "@/features/marketplace/types";
 
 export default function RfqDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [rfq, setRfq] = useState<BuyerRfq | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -186,9 +187,32 @@ export default function RfqDetailPage() {
           </div>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5">
             <h3 className="font-semibold text-slate-900">Messages</h3>
-            <p className="mt-2 text-sm text-slate-600">Buyer–provider messaging will open here after award.</p>
-            <Button type="button" variant="outline" className="mt-4" disabled>
-              Messages coming soon
+            <p className="mt-2 text-sm text-slate-600">
+              Chat with {awarded.providerName}. Phone numbers and emails are blocked in chat.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              disabled={busy === "chat"}
+              onClick={() => {
+                if (rfq.conversationId) {
+                  router.push(routes.message(rfq.conversationId));
+                  return;
+                }
+                setBusy("chat");
+                void api
+                  .get<{ id: string }>(`/rfqs/${rfq.id}/conversation`)
+                  .then((data) => {
+                    router.push(routes.message(data.id));
+                  })
+                  .catch((err: unknown) => {
+                    setActionError(err instanceof Error ? err.message : "Could not open chat");
+                    setBusy(null);
+                  });
+              }}
+            >
+              {busy === "chat" ? "Opening…" : "Open messages"}
             </Button>
           </div>
         </div>

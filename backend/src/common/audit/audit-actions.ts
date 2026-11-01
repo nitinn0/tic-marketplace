@@ -47,5 +47,7 @@ export const AUDIT_ENTITIES = {
   professionalExperience: 'professional_experience',
   rfq: 'rfq',
   rfqQuote: 'rfq_quote',
+  conversation: 'conversation',
+  message: 'message',
   notification: 'notification',
 } as const;

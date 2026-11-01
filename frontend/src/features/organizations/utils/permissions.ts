@@ -34,6 +34,12 @@ export const PROFESSIONAL_FUNCTIONALITIES = {
   experience: "professionals.experience",
 } as const;
 
+/** Mirrors backend RFQ_FUNCTIONALITIES (organization roles). */
+export const RFQ_FUNCTIONALITIES = {
+  buyer: "rfqs.buyer",
+  provider: "rfqs.provider",
+} as const;
+
 const ACTION_TO_FLAG: Record<PermissionAction, keyof Omit<PermissionEntry, "functionalityCode">> = {
   view: "canView",
   create: "canCreate",

@@ -20,6 +20,7 @@ import { MarketplaceModule } from './modules/marketplace/marketplace.module.js';
 import { RfqModule } from './modules/rfq/rfq.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { AdminProvidersModule } from './modules/admin-providers/admin-providers.module.js';
+import { ChatModule } from './modules/chat/chat.module.js';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AdminProvidersModule } from './modules/admin-providers/admin-providers.
     RfqModule,
     NotificationsModule,
     AdminProvidersModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

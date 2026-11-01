@@ -165,7 +165,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}, didRefres
   const { headers: customHeaders, ...init } = options;
 
   const headers = new Headers(customHeaders);
-  if (!headers.has("Content-Type") && init.body) {
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (!headers.has("Content-Type") && init.body && !isFormData) {
     headers.set("Content-Type", "application/json");
   }
   if (token && !headers.has("Authorization")) {
@@ -236,6 +237,12 @@ export const api = {
     request<T>(endpoint, {
       method: "POST",
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      ...options,
+    }),
+  postForm: <T>(endpoint: string, body: FormData, options?: RequestInit) =>
+    request<T>(endpoint, {
+      method: "POST",
+      body,
       ...options,
     }),
   patch: <T>(endpoint: string, body?: unknown, options?: RequestInit) =>

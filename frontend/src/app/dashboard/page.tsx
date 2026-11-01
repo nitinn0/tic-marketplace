@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, FileText, FlaskConical, Search } from "lucide-react";
+import { ArrowRight, Building2, FileText, FlaskConical, MessageSquare, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
@@ -29,6 +29,7 @@ const ACTIONS = [
   { href: routes.services, title: "Search services", body: "Labs, certification, inspection and ESG.", icon: Search },
   { href: routes.rfqNew, title: "Create an RFQ", body: "One request, matched providers, masked identity.", icon: FileText },
   { href: routes.rfqs, title: "My RFQs", body: "Compare quotes as they come back.", icon: FlaskConical },
+  { href: routes.messages, title: "Messages", body: "Chat with awarded buyers or providers.", icon: MessageSquare },
   { href: routes.organizations, title: "Business details", body: "Switch buyer or provider organization.", icon: Building2 },
 ];
 
@@ -155,7 +156,7 @@ export default function DashboardPage() {
         <div className="mt-8 space-y-8">
           <HighlightCarousel slides={slides} />
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {ACTIONS.map(({ href, title, body, icon: Icon }) => (
               <Link
                 key={href}

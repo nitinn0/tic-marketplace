@@ -19,6 +19,10 @@ dist/
 coverage/
 **/coverage/
 
+# Uploaded provider service documents
+uploads/
+**/uploads/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

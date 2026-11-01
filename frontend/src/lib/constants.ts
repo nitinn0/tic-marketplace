@@ -30,6 +30,8 @@ export const routes = {
   rfqs: "/rfq",
   rfq: (id: string) => `/rfq/${id}`,
   providerRfqs: "/provider/rfqs",
+  messages: "/messages",
+  message: (id: string) => `/messages/${id}`,
   join: "/join",
   howItWorks: "/how-it-works",
 } as const;

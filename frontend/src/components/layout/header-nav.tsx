@@ -22,11 +22,11 @@ export function HeaderNav() {
     { label: "Services", href: routes.services, active: matches(routes.services) },
     { label: "Providers", href: "/providers", active: matches("/providers") },
     { label: "How it works", href: routes.howItWorks, active: pathname === routes.howItWorks },
-    // {
-    //   label: "Dashboard",
-    //   href: dashboardHref,
-    //   active: pathname === routes.dashboard || pathname === routes.providerDashboard,
-    // },
+    {
+      label: "Dashboard",
+      href: dashboardHref,
+      active: pathname === routes.dashboard || pathname === routes.providerDashboard,
+    },
   ];
 
   return (

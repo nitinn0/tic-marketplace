@@ -1,3 +1,12 @@
+export type MarketplaceServiceDocument = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  providerName: string;
+};
+
 export type MarketplaceService = {
   id: string;
   slug: string;
@@ -9,6 +18,10 @@ export type MarketplaceService = {
   categoryPath: string[];
   providerCount: number;
   postedBy: { id: string; name: string } | null;
+  /** Present only for authenticated buyers. */
+  documents?: MarketplaceServiceDocument[];
+  /** Present for anonymous buyers when files exist but are hidden. */
+  documentsAvailable?: boolean;
 };
 
 export type MarketplaceProvider = {
@@ -69,6 +82,7 @@ export type BuyerRfq = {
   service: { id: string; name: string; slug: string };
   matches: { providerId: string; name: string; score: number; reasons: string[] }[];
   awardedQuoteId: string | null;
+  conversationId: string | null;
   quotes: BuyerQuote[];
 };
 
@@ -86,6 +100,7 @@ export type ProviderRfq = {
   matchReasons: string[];
   masked: string[];
   visible: string[];
+  conversationId: string | null;
   quote: {
     id: string;
     amount: number;

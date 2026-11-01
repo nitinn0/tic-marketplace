@@ -402,13 +402,14 @@ export async function seedRbac(prisma: PrismaClient) {
     2,
     'Read masked RFQs dispatched to the provider and submit quotes.',
   );
-  const VIEW_CREATE: Flags = { canView: true, canCreate: true, canEdit: false, canDelete: false, canConfigure: false };
+  // Buyers need edit to accept/close RFQs; providers need edit to withdraw quotes.
+  const VIEW_CREATE_EDIT: Flags = { canView: true, canCreate: true, canEdit: true, canDelete: false, canConfigure: false };
   await upsertRolePermission(superAdminRole.id, buyerRfqs.id, adminLevel.id, FULL);
   await upsertRolePermission(superAdminRole.id, providerRfqs.id, adminLevel.id, FULL);
-  await upsertRolePermission(buyerAdmin.id, buyerRfqs.id, adminLevel.id, VIEW_CREATE);
-  await upsertRolePermission(buyerUser.id, buyerRfqs.id, viewerLevel.id, VIEW_CREATE);
-  await upsertRolePermission(providerAdmin.id, providerRfqs.id, adminLevel.id, VIEW_CREATE);
-  await upsertRolePermission(providerUser.id, providerRfqs.id, viewerLevel.id, VIEW_CREATE);
+  await upsertRolePermission(buyerAdmin.id, buyerRfqs.id, adminLevel.id, VIEW_CREATE_EDIT);
+  await upsertRolePermission(buyerUser.id, buyerRfqs.id, viewerLevel.id, VIEW_CREATE_EDIT);
+  await upsertRolePermission(providerAdmin.id, providerRfqs.id, adminLevel.id, VIEW_CREATE_EDIT);
+  await upsertRolePermission(providerUser.id, providerRfqs.id, viewerLevel.id, VIEW_CREATE_EDIT);
 
   return { superAdminRole, adminRole, userRole, buyerAdmin, buyerUser, providerAdmin, providerUser, professionalRole };
 }

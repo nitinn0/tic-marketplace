@@ -3,6 +3,12 @@ import type { CoverageType, Prisma } from '@prisma/client';
 
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../../../common/audit/audit-actions.js';
 import { AuditService } from '../../../common/audit/audit.service.js';
+import {
+  assertServiceDocuments,
+  deleteStoredFiles,
+  persistServiceDocuments,
+  type UploadedServiceDocument,
+} from '../../../common/uploads/service-document-storage.js';
 import { isUniqueViolation } from '../../../common/utils/prisma-errors.js';
 import { PrismaService } from '../../../database/prisma.service.js';
 import {
@@ -109,7 +115,9 @@ export class ProviderCapabilitiesService {
     organizationId: string,
     actorId: string,
     input: { categoryId: string; name: string; description?: string | null },
+    documents: UploadedServiceDocument[],
   ) {
+    assertServiceDocuments(documents);
     const providerId = await this.requireProfileId(organizationId);
     const index = await this.lookup.categoryIndex();
     if (!isEffectivelyActive(index, input.categoryId)) {
@@ -137,6 +145,26 @@ export class ProviderCapabilitiesService {
     }
 
     await this.add(organizationId, actorId, 'services', { id: serviceId });
+
+    let storageKeys: string[] = [];
+    try {
+      const saved = await persistServiceDocuments(organizationId, serviceId, documents);
+      storageKeys = saved.map((row) => row.storageKey);
+      await this.prisma.providerServiceDocument.createMany({
+        data: saved.map((row) => ({
+          providerId,
+          serviceId,
+          originalName: row.originalName,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          storageKey: row.storageKey,
+        })),
+      });
+    } catch (error) {
+      await deleteStoredFiles(storageKeys);
+      throw error;
+    }
+
     await this.prisma.providerProfile.update({ where: { id: providerId }, data: { publicProfile: true } });
     return this.listServices(providerId);
   }
@@ -167,6 +195,16 @@ export class ProviderCapabilitiesService {
 
   async remove(organizationId: string, actorId: string, kind: CapabilityKind, refId: string) {
     const providerId = await this.requireProfileId(organizationId);
+    let storageKeys: string[] = [];
+
+    if (kind === 'services') {
+      storageKeys = (
+        await this.prisma.providerServiceDocument.findMany({
+          where: { providerId, serviceId: refId },
+          select: { storageKey: true },
+        })
+      ).map((row) => row.storageKey);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const removed = await this.repository(tx, kind).remove(providerId, [refId]);
@@ -175,6 +213,10 @@ export class ProviderCapabilitiesService {
       }
       await this.logChange(tx, organizationId, providerId, actorId, { kind, added: [], removed: [refId] });
     });
+
+    if (storageKeys.length) {
+      await deleteStoredFiles(storageKeys);
+    }
 
     return this.list(providerId, kind);
   }
@@ -194,11 +236,17 @@ export class ProviderCapabilitiesService {
 
   async listServices(providerId: string) {
     const [rows, index] = await Promise.all([
-      this.prisma.providerService.findMany({ where: { providerId }, include: { service: true } }),
+      this.prisma.providerService.findMany({
+        where: { providerId },
+        include: {
+          service: true,
+          documents: { orderBy: { createdAt: 'asc' }, select: { id: true, originalName: true, mimeType: true, sizeBytes: true, createdAt: true } },
+        },
+      }),
       this.lookup.categoryIndex(),
     ]);
     return rows
-      .map(({ service, createdAt }) => {
+      .map(({ service, createdAt, documents }) => {
         const category = index.byId.get(service.categoryId);
         return {
           id: service.id,
@@ -209,6 +257,13 @@ export class ProviderCapabilitiesService {
           category: category ? { id: category.id, name: category.name, categoryType: category.categoryType } : null,
           categoryPath: this.lookup.categoryPath(index, service.categoryId),
           assignedAt: createdAt,
+          documents: documents.map((document) => ({
+            id: document.id,
+            originalName: document.originalName,
+            mimeType: document.mimeType,
+            sizeBytes: document.sizeBytes,
+            createdAt: document.createdAt,
+          })),
         };
       })
       .sort((a, b) => a.categoryPath.join('/').localeCompare(b.categoryPath.join('/')) || a.name.localeCompare(b.name));

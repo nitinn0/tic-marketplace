@@ -9,11 +9,13 @@ import { PUBLIC_PROVIDER_PROFILE_WHERE } from '../providers/provider-visibility.
 import type { OrganizationAccessContext } from '../rbac/services/organization-access.service.js';
 import { locationLabel } from '../taxonomy/utils/location.util.js';
 import { ancestorsOf, buildTreeIndex } from '../taxonomy/utils/tree.util.js';
+import { ChatService } from '../chat/chat.service.js';
 import { CreateRfqDto, SubmitQuoteDto } from './dto/rfq.dto.js';
 import { asReasonList, locationMatches, rankProviders, scrubBuyerIdentity } from './rfq-matching.js';
 
 const buyerInclude = {
   service: { select: { id: true, name: true, slug: true, categoryId: true } },
+  conversation: { select: { id: true } },
   dispatches: {
     orderBy: { matchScore: 'desc' as const },
     include: {
@@ -37,6 +39,7 @@ export class RfqService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly chat: ChatService,
   ) {}
 
   async create(context: OrganizationAccessContext, userId: string, dto: CreateRfqDto) {
@@ -102,6 +105,7 @@ export class RfqService {
       throw new BadRequestException('Only a submitted quote can be accepted');
     }
 
+    let conversationId: string | null = null;
     await this.prisma.$transaction(async (tx) => {
       await tx.rfqQuote.update({ where: { id: quote.id }, data: { status: 'ACCEPTED' } });
       await tx.rfqQuote.updateMany({
@@ -109,6 +113,12 @@ export class RfqService {
         data: { status: 'REJECTED' },
       });
       await tx.rfq.update({ where: { id: rfqId }, data: { status: 'CLOSED' } });
+      const conversation = await this.chat.createForAwardedQuote(tx, {
+        rfqId,
+        buyerOrganizationId: context.organization.id,
+        providerId: quote.providerId,
+      });
+      conversationId = conversation.id;
       await this.audit.log(
         {
           action: AUDIT_ACTIONS.rfqQuoteAccepted,
@@ -116,7 +126,7 @@ export class RfqService {
           entityId: quote.id,
           organizationId: context.organization.id,
           actorUserId: actorId,
-          metadata: { rfqId, providerId: quote.providerId },
+          metadata: { rfqId, providerId: quote.providerId, conversationId },
         },
         tx,
       );
@@ -128,9 +138,9 @@ export class RfqService {
       {
         type: 'QUOTE_ACCEPTED',
         title: 'Your quote was accepted',
-        body: `A buyer accepted your quote on “${rfq.title}”.`,
-        entityType: 'rfq',
-        entityId: rfqId,
+        body: `A buyer accepted your quote on “${rfq.title}”. You can message them now.`,
+        entityType: 'conversation',
+        entityId: conversationId,
       },
       rejected.map((row) => row.providerId),
       {
@@ -376,6 +386,7 @@ export class RfqService {
         reasons: asReasonList(dispatch.matchReasons),
       })),
       awardedQuoteId: accepted?.id ?? null,
+      conversationId: rfq.conversation?.id ?? null,
       quotes: rfq.quotes.map((quote) => ({
         id: quote.id,
         providerId: quote.providerId,
@@ -410,6 +421,7 @@ export class RfqService {
       matchReasons: asReasonList(reasons),
       masked: ['companyName', 'email', 'personalDetails'],
       visible: ['location', 'sites', 'employeeCount', 'service', 'timeline'],
+      conversationId: quote?.status === 'ACCEPTED' ? (rfq.conversation?.id ?? null) : null,
       quote: quote
         ? {
             id: quote.id,
@@ -428,6 +440,7 @@ export class RfqService {
   private providerRfqInclude(providerId: string) {
     return {
       service: { select: { name: true, slug: true } },
+      conversation: { select: { id: true } },
       quotes: { where: { providerId }, orderBy: { updatedAt: 'desc' as const }, take: 1 },
     } satisfies Prisma.RfqInclude;
   }

@@ -13,6 +13,7 @@ import {
 
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { ChatService } from '../chat/chat.service.js';
 import { RFQ_FUNCTIONALITIES as R } from '../rbac/constants/permission.constants.js';
 import { CurrentOrganization, OrganizationScoped } from '../rbac/decorators/organization-scoped.decorator.js';
 import { RequirePermission } from '../rbac/decorators/require-permission.decorator.js';
@@ -25,7 +26,10 @@ import { CreateRfqDto, SubmitQuoteDto } from './dto/rfq.dto.js';
 @OrganizationScoped({ organizationTypes: ['BUYER'] })
 @Controller('rfqs')
 export class BuyerRfqController {
-  constructor(private readonly rfqs: RfqService) {}
+  constructor(
+    private readonly rfqs: RfqService,
+    private readonly chat: ChatService,
+  ) {}
 
   @Get()
   @RequirePermission(R.buyer, 'view')
@@ -81,14 +85,13 @@ export class BuyerRfqController {
     });
   }
 
-  /** Stub — buyer/provider messaging lands in a later release. */
-  @Get(':id/messages')
+  @Get(':id/conversation')
   @RequirePermission(R.buyer, 'view')
-  messages() {
-    throw new NotImplementedException({
-      status: 'not_implemented',
-      message: 'Messaging is not available yet.',
-    });
+  conversation(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.chat.getForRfq(context, id);
   }
 }
 
@@ -96,7 +99,10 @@ export class BuyerRfqController {
 @OrganizationScoped({ organizationTypes: ['PROVIDER'] })
 @Controller('provider/rfqs')
 export class ProviderRfqController {
-  constructor(private readonly rfqs: RfqService) {}
+  constructor(
+    private readonly rfqs: RfqService,
+    private readonly chat: ChatService,
+  ) {}
 
   @Get()
   @RequirePermission(R.provider, 'view')
@@ -131,12 +137,12 @@ export class ProviderRfqController {
     return this.rfqs.withdrawQuote(context, user.sub, id);
   }
 
-  @Get(':id/messages')
+  @Get(':id/conversation')
   @RequirePermission(R.provider, 'view')
-  messages() {
-    throw new NotImplementedException({
-      status: 'not_implemented',
-      message: 'Messaging is not available yet.',
-    });
+  conversation(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.chat.getForRfq(context, id);
   }
 }

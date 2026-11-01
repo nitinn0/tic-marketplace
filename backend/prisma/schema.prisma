@@ -40,6 +40,8 @@ model User {
   notifications           Notification[]
   passwordResetTokens     PasswordResetToken[]
   emailChangeTokens       EmailChangeToken[]
+  sentMessages            Message[]
+  conversationReads       ConversationRead[]
 
   @@index([email])
   @@index([status])
@@ -299,11 +301,13 @@ model Organization {
   createdAt          DateTime                       @default(now()) @map("created_at")
   updatedAt          DateTime                       @updatedAt @map("updated_at")
 
-  members         OrganizationUser[]
-  invitations     OrganizationInvitation[]
-  auditLogs       AuditLog[]
-  providerProfile ProviderProfile?
-  rfqs            Rfq[]
+  members                OrganizationUser[]
+  invitations            OrganizationInvitation[]
+  auditLogs              AuditLog[]
+  providerProfile        ProviderProfile?
+  rfqs                   Rfq[]
+  buyerConversations     Conversation[] @relation("BuyerConversations")
+  providerConversations  Conversation[] @relation("ProviderConversations")
 
   @@index([organizationType])
   @@index([status])
@@ -421,8 +425,9 @@ model Service {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  category  ServiceCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category  ServiceCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   providers ProviderService[]
+  documents ProviderServiceDocument[]
   rfqs      Rfq[]
 
   @@unique([categoryId, name])
@@ -552,6 +557,7 @@ model ProviderProfile {
   locations     ProviderLocation[]
   rfqDispatches RfqDispatch[]
   rfqQuotes     RfqQuote[]
+  conversations Conversation[]
 
   @@index([providerTypes])
   @@index([verificationStatus])
@@ -564,12 +570,32 @@ model ProviderService {
   serviceId  String   @map("service_id") @db.Uuid
   createdAt  DateTime @default(now()) @map("created_at")
 
-  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  provider  ProviderProfile           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service   Service                   @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  documents ProviderServiceDocument[]
 
   @@id([providerId, serviceId])
   @@index([serviceId])
   @@map("provider_services")
+}
+
+/// Supporting files a provider attaches when posting a service. Visible to logged-in buyers only.
+model ProviderServiceDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  providerId   String   @map("provider_id") @db.Uuid
+  serviceId    String   @map("service_id") @db.Uuid
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  storageKey   String   @map("storage_key")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  providerService ProviderService @relation(fields: [providerId, serviceId], references: [providerId, serviceId], onDelete: Cascade)
+  service         Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([providerId, serviceId])
+  @@index([serviceId])
+  @@map("provider_service_documents")
 }
 
 /// A declared/supported standard. This is NOT an accreditation claim (Phase 5).
@@ -690,6 +716,7 @@ model Rfq {
   service           Service      @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   dispatches        RfqDispatch[]
   quotes            RfqQuote[]
+  conversation      Conversation?
 
   @@index([buyerOrganizationId, createdAt])
   @@index([serviceId])
@@ -735,6 +762,59 @@ model RfqQuote {
   @@unique([rfqId, providerId])
   @@index([providerId])
   @@map("rfq_quotes")
+}
+
+/// 1:1 buyer–provider thread opened when a quote is awarded on an RFQ. No group chats.
+model Conversation {
+  id                     String    @id @default(uuid()) @db.Uuid
+  rfqId                  String    @unique @map("rfq_id") @db.Uuid
+  buyerOrganizationId    String    @map("buyer_organization_id") @db.Uuid
+  providerOrganizationId String    @map("provider_organization_id") @db.Uuid
+  providerId             String    @map("provider_id") @db.Uuid
+  lastMessageAt          DateTime? @map("last_message_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  rfq                  Rfq               @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  buyerOrganization    Organization      @relation("BuyerConversations", fields: [buyerOrganizationId], references: [id], onDelete: Cascade)
+  providerOrganization Organization      @relation("ProviderConversations", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
+  provider             ProviderProfile   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  messages             Message[]
+  reads                ConversationRead[]
+
+  @@index([buyerOrganizationId, lastMessageAt])
+  @@index([providerOrganizationId, lastMessageAt])
+  @@index([providerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderUserId   String   @map("sender_user_id") @db.Uuid
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt])
+  @@index([senderUserId])
+  @@map("messages")
+}
+
+model ConversationRead {
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  lastReadAt     DateTime @map("last_read_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_reads")
 }
 
 model Notification {

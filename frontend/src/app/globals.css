@@ -63,3 +63,510 @@ body {
 .auth-rise {
   animation: auth-rise 0.45s ease-out both;
 }
+
+/* ==========================================================
+   Home page motion + 3D utilities (Indigo + Coral redesign)
+   Paste into your global stylesheet (e.g. app/globals.css).
+   ========================================================== */
+
+/* Scroll-reveal (used by <Reveal />) */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* 3D floating icons / chips in the hero */
+.parallax-layer {
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+}
+.float-3d {
+  transform-style: preserve-3d;
+  animation: float-3d var(--dur, 7s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes float-3d {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(14deg) rotateY(-16deg) rotateZ(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -16px, 28px) rotateX(-10deg) rotateY(16deg) rotateZ(4deg);
+  }
+}
+
+/* RFQ preview: quotes slide in, match bars fill */
+.quote-in {
+  opacity: 0;
+  transform: translateX(18px);
+  animation: quote-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes quote-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bar-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: bar-fill 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes bar-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Hover lift with a hint of 3D tilt */
+.tilt-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transform-style: preserve-3d;
+}
+.tilt-card:hover {
+  transform: translateY(-6px) perspective(900px) rotateX(2deg);
+  border-color: rgb(196 181 253); /* violet-300 */
+  box-shadow: 0 28px 50px -26px rgba(67, 56, 202, 0.45);
+}
+
+/* Skeleton loaders */
+.skeleton {
+  background: linear-gradient(90deg, #ebe9fb 25%, #f7f6ff 40%, #ebe9fb 65%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* Optional: frosted sticky header. Add this class to your site header. */
+.glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(199, 210, 254, 0.6); /* indigo-200 */
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .float-3d,
+  .quote-in,
+  .bar-fill,
+  .skeleton {
+    animation: none;
+  }
+  .quote-in,
+  .bar-fill {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .parallax-layer,
+  .tilt-card {
+    transition: none;
+    transform: none;
+  }
+}
+/* ==========================================================
+   Home page motion + 3D utilities (Terracotta + Deep Teal redesign)
+   Paste into your global stylesheet (e.g. app/globals.css).
+   ========================================================== */
+
+/* Scroll-reveal (used by <Reveal />) */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* 3D floating icons / chips in the hero */
+.parallax-layer {
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+}
+.float-3d {
+  transform-style: preserve-3d;
+  animation: float-3d var(--dur, 7s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes float-3d {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(14deg) rotateY(-16deg) rotateZ(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -16px, 28px) rotateX(-10deg) rotateY(16deg) rotateZ(4deg);
+  }
+}
+
+/* RFQ preview: quotes slide in, match bars fill */
+.quote-in {
+  opacity: 0;
+  transform: translateX(18px);
+  animation: quote-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes quote-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bar-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: bar-fill 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes bar-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Hover lift with a hint of 3D tilt */
+.tilt-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transform-style: preserve-3d;
+}
+.tilt-card:hover {
+  transform: translateY(-6px) perspective(900px) rotateX(2deg);
+  border-color: rgb(124 192 200); /* teal tint */
+  box-shadow: 0 28px 50px -26px rgba(15, 76, 92, 0.45);
+}
+
+/* Skeleton loaders */
+.skeleton {
+  background: linear-gradient(90deg, #efe5d6 25%, #f8f1e7 40%, #efe5d6 65%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* Optional: frosted sticky header. Add this class to your site header. */
+.glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(234, 223, 207, 0.8); /* sand */
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .float-3d,
+  .quote-in,
+  .bar-fill,
+  .skeleton {
+    animation: none;
+  }
+  .quote-in,
+  .bar-fill {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .parallax-layer,
+  .tilt-card {
+    transition: none;
+    transform: none;
+  }
+}
+
+
+/* ==========================================================
+   Scroll feel v2: progress bar, hero parallax, marquee,
+   directional reveals, pinned story
+   ========================================================== */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+.reveal {
+  filter: blur(0);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.7s ease;
+  transition-delay: var(--d, 0ms);
+}
+.reveal-left { transform: translateX(-40px); }
+.reveal-right { transform: translateX(40px); }
+.reveal-scale { transform: scale(0.9); }
+.reveal-blur { filter: blur(14px); transform: translateY(24px); }
+.reveal-tilt {
+  transform: perspective(900px) rotateX(16deg) translateY(44px) scale(0.95);
+  transform-origin: 50% 100%;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+/* Hero drifts at different speeds as you scroll away (--hp is 0..1) */
+.hero-copy {
+  transform: translate3d(0, calc(var(--hp, 0) * -56px), 0);
+  opacity: calc(1 - var(--hp, 0) * 1.1);
+  will-change: transform, opacity;
+}
+.hero-visual {
+  transform: translate3d(0, calc(var(--hp, 0) * 80px), 0) scale(calc(1 - var(--hp, 0) * 0.1));
+  will-change: transform;
+}
+
+/* Scroll-linked marquee (--mp is 0..1 as the band crosses the viewport) */
+.stroke-text {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.6);
+}
+.marquee-row {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+}
+.marquee-a { transform: translate3d(calc(var(--mp, 0) * -40%), 0, 0); }
+.marquee-b { transform: translate3d(calc(-40% + var(--mp, 0) * 40%), 0, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-copy,
+  .hero-visual,
+  .marquee-a,
+  .marquee-b {
+    transform: none;
+    opacity: 1;
+  }
+  .reveal-blur,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale,
+  .reveal-tilt {
+    filter: none;
+    transform: none;
+  }
+}
+/* ==========================================================
+   Home page motion + 3D utilities (Terracotta + Deep Teal redesign)
+   Paste into your global stylesheet (e.g. app/globals.css).
+   ========================================================== */
+
+/* Scroll-reveal (used by <Reveal />) */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* 3D floating icons / chips in the hero */
+.parallax-layer {
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+}
+.float-3d {
+  transform-style: preserve-3d;
+  animation: float-3d var(--dur, 7s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes float-3d {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(14deg) rotateY(-16deg) rotateZ(-4deg);
+  }
+  50% {
+    transform: translate3d(0, -16px, 28px) rotateX(-10deg) rotateY(16deg) rotateZ(4deg);
+  }
+}
+
+/* RFQ preview: quotes slide in, match bars fill */
+.quote-in {
+  opacity: 0;
+  transform: translateX(18px);
+  animation: quote-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes quote-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bar-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: bar-fill 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) forwards;
+}
+@keyframes bar-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Hover lift with a hint of 3D tilt */
+.tilt-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transform-style: preserve-3d;
+}
+.tilt-card:hover {
+  transform: translateY(-6px) perspective(900px) rotateX(2deg);
+  border-color: rgb(124 192 200); /* teal tint */
+  box-shadow: 0 28px 50px -26px rgba(15, 76, 92, 0.45);
+}
+
+/* Skeleton loaders */
+.skeleton {
+  background: linear-gradient(90deg, #efe5d6 25%, #f8f1e7 40%, #efe5d6 65%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* Optional: frosted sticky header. Add this class to your site header. */
+.glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(234, 223, 207, 0.8); /* sand */
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .float-3d,
+  .quote-in,
+  .bar-fill,
+  .skeleton {
+    animation: none;
+  }
+  .quote-in,
+  .bar-fill {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .parallax-layer,
+  .tilt-card {
+    transition: none;
+    transform: none;
+  }
+}
+
+
+/* ==========================================================
+   Scroll feel v2: progress bar, hero parallax, marquee,
+   directional reveals, pinned story
+   ========================================================== */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+.reveal {
+  filter: blur(0);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.7s ease;
+  transition-delay: var(--d, 0ms);
+}
+.reveal-left { transform: translateX(-40px); }
+.reveal-right { transform: translateX(40px); }
+.reveal-scale { transform: scale(0.9); }
+.reveal-blur { filter: blur(14px); transform: translateY(24px); }
+.reveal-tilt {
+  transform: perspective(900px) rotateX(16deg) translateY(44px) scale(0.95);
+  transform-origin: 50% 100%;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+/* Hero drifts at different speeds as you scroll away (--hp is 0..1) */
+.hero-copy {
+  transform: translate3d(0, calc(var(--hp, 0) * -56px), 0);
+  opacity: calc(1 - var(--hp, 0) * 1.1);
+  will-change: transform, opacity;
+}
+.hero-visual {
+  transform: translate3d(0, calc(var(--hp, 0) * 80px), 0) scale(calc(1 - var(--hp, 0) * 0.1));
+  will-change: transform;
+}
+
+/* Scroll-linked marquee (--mp is 0..1 as the band crosses the viewport) */
+.stroke-text {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.6);
+}
+.marquee-row {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+}
+.marquee-a { transform: translate3d(calc(var(--mp, 0) * -40%), 0, 0); }
+.marquee-b { transform: translate3d(calc(-40% + var(--mp, 0) * 40%), 0, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-copy,
+  .hero-visual,
+  .marquee-a,
+  .marquee-b {
+    transform: none;
+    opacity: 1;
+  }
+  .reveal-blur,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale,
+  .reveal-tilt {
+    filter: none;
+    transform: none;
+  }
+}

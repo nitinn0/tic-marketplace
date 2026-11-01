@@ -68,11 +68,11 @@ export function ChatLauncher() {
   return (
     <div ref={root} className="pointer-events-none fixed bottom-5 right-4 z-40 sm:bottom-7 sm:right-7">
       {open ? (
-        <div className="chat-launcher-panel pointer-events-auto mb-3 flex h-[min(32rem,70vh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-[0_28px_60px_-24px_rgba(15,23,42,0.45)]">
-          <div className="flex items-center justify-between bg-gradient-to-r from-sky-700 to-sky-900 px-4 py-3 text-white">
+        <div className="chat-launcher-panel pointer-events-auto mb-3 flex h-[min(32rem,70vh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[1.35rem] border border-[#EADFCF] bg-white shadow-[0_28px_60px_-24px_rgba(18,48,58,0.45)]">
+          <div className="flex items-center justify-between bg-[#0B3440] px-4 py-3 text-white">
             <div>
               <p className="text-sm font-semibold">Messages</p>
-              <p className="text-[11px] text-sky-100">Award chats stay private on TIC</p>
+              <p className="text-[11px] text-white/70">Award chats stay private on TIC</p>
             </div>
             <button
               type="button"
@@ -87,7 +87,7 @@ export function ChatLauncher() {
           <div className="min-h-0 flex-1">
             {loading && conversations.length === 0 ? (
               <div className="flex h-full items-center justify-center">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-sky-200 border-t-sky-700" />
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#E8F4F5] border-t-[#0F4C5C]" />
               </div>
             ) : (
               <ConversationList
@@ -101,11 +101,11 @@ export function ChatLauncher() {
             )}
           </div>
 
-          <div className="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+          <div className="border-t border-[#EADFCF] bg-[#FBF6F0] px-3 py-2.5">
             <Link
               href={routes.messages}
               onClick={() => setOpen(false)}
-              className="block rounded-xl bg-white px-3 py-2 text-center text-sm font-semibold text-sky-800 ring-1 ring-slate-200 transition hover:bg-sky-50"
+              className="block rounded-xl bg-white px-3 py-2 text-center text-sm font-semibold text-[#0F4C5C] ring-1 ring-[#EADFCF] transition hover:bg-[#E8F4F5]"
             >
               Open full inbox
             </Link>
@@ -121,10 +121,10 @@ export function ChatLauncher() {
           if (!open) load();
         }}
         className={cn(
-          "pointer-events-auto relative inline-flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_18px_40px_-16px_rgba(14,91,215,0.9)] transition duration-200",
-          "bg-gradient-to-br from-sky-600 to-sky-900 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_-14px_rgba(14,91,215,0.95)]",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500",
-          open && "ring-4 ring-sky-200",
+          "pointer-events-auto relative inline-flex h-14 w-14 items-center justify-center rounded-full text-[#0B2530] shadow-[0_18px_40px_-16px_rgba(227,111,71,0.9)] transition duration-200",
+          "bg-gradient-to-br from-[#E36F47] to-[#A9421F] hover:-translate-y-0.5 hover:shadow-[0_22px_44px_-14px_rgba(227,111,71,0.95)]",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F4C5C]",
+          open && "ring-4 ring-[#F2A98B]",
         )}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}

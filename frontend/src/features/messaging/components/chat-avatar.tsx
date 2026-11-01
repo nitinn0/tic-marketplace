@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
 const PALETTE = [
-  "from-sky-600 to-sky-800",
-  "from-teal-600 to-teal-800",
-  "from-indigo-600 to-indigo-800",
-  "from-cyan-600 to-cyan-800",
-  "from-slate-600 to-slate-800",
+  "from-[#0B3B47] to-[#1B7F8C]",
+  "from-[#A9421F] to-[#E36F47]",
+  "from-[#12303A] to-[#2F5D68]",
+  "from-[#7A5410] to-[#C9922B]",
+  "from-[#0F4C5C] to-[#166B78]",
 ] as const;
 
 function initials(name: string) {
@@ -34,7 +34,7 @@ export function ChatAvatar({
     <span
       aria-hidden
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-semibold text-white shadow-sm ring-2 ring-white",
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-semibold text-white shadow-sm ring-2 ring-[#FBF6F0]",
         tone(name),
         size === "sm" && "h-8 w-8 text-[10px]",
         size === "md" && "h-10 w-10 text-xs",

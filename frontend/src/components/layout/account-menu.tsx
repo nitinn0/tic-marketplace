@@ -12,6 +12,7 @@ import {
   Heart,
   MapPin,
   Package,
+  Settings,
   Sparkles,
   User,
   UserRound,
@@ -29,6 +30,7 @@ import { MarketplaceNavLinks } from "./marketplace-nav-links";
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: routes.dashboard, label: "My Profile", icon: UserRound },
+  { href: routes.accountSettings, label: "Account settings", icon: Settings },
   { href: routes.rfqs, label: "My Orders", icon: ClipboardList },
   { href: routes.rfqs, label: "My RFQ's", icon: Package },
   { href: routes.organizations, label: "My Business Details", icon: Briefcase },

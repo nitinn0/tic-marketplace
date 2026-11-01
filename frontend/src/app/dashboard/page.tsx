@@ -240,6 +240,11 @@ export default function DashboardPage() {
                   <dd className="truncate font-medium text-slate-900">{activeOrganization?.displayName ?? "None selected"}</dd>
                 </div>
               </dl>
+              <div className="mt-5">
+                <Link href={routes.accountSettings} className="text-sm font-medium text-sky-700 hover:text-sky-800">
+                  Change email
+                </Link>
+              </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 {roles.map((role) => (
                   <span key={role.id} className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">

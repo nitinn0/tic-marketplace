@@ -11,6 +11,7 @@ export const routes = {
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
   dashboard: "/dashboard",
+  accountSettings: "/account/settings",
   adminRbac: "/admin/rbac",
   adminTaxonomy: "/admin/taxonomy",
   adminVerification: "/admin/verification",

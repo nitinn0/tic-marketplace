@@ -17,6 +17,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto.js';
+import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 
 @Controller('auth')
@@ -64,6 +66,20 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-email/request')
+  @HttpCode(HttpStatus.OK)
+  async requestEmailChange(@Req() req: Request, @Body() dto: RequestEmailChangeDto) {
+    return this.authService.requestEmailChange(req.user as { sub: string }, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-email/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmEmailChange(@Req() req: Request, @Body() dto: ConfirmEmailChangeDto) {
+    return this.authService.confirmEmailChange(req.user as { sub: string }, dto);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomBytes, randomInt } from 'node:crypto';
 
 import { PrismaService } from '../../database/prisma.service.js';
 import { OrganizationAccessService } from '../rbac/services/organization-access.service.js';
@@ -16,8 +18,9 @@ import { LoginDto } from './dto/login.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto.js';
+import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto.js';
 import { MailService } from '../../common/mail/mail.service.js';
-import { randomBytes } from 'node:crypto';
 
 type PublicUser = {
   id: string;
@@ -153,6 +156,121 @@ export class AuthService {
 
   async verifyEmail(dto: VerifyEmailDto) {
     return { message: 'Email verification not implemented yet', ...dto };
+  }
+
+  async requestEmailChange(requestUser: { sub: string }, dto: RequestEmailChangeDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: requestUser.sub } });
+    if (!user || user.status !== 'ACTIVE' || !user.passwordHash) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.assertCanChangeEmail(user.id);
+
+    const newEmail = dto.newEmail.toLowerCase().trim();
+    if (newEmail === user.email.toLowerCase()) {
+      throw new BadRequestException('New email must be different from your current email');
+    }
+
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
+    if (existing) {
+      throw new BadRequestException('An account with this email already exists');
+    }
+
+    const otp = String(randomInt(100000, 1000000));
+    const otpHash = await bcrypt.hash(otp, 12);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await this.prisma.$transaction([
+      this.prisma.emailChangeToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.emailChangeToken.create({
+        data: { userId: user.id, newEmail, otpHash, expiresAt },
+      }),
+    ]);
+
+    await this.mail.send({
+      to: newEmail,
+      subject: 'Confirm your new TIC Marketplace email',
+      text: `Your email change code is ${otp}. It expires in 10 minutes.\n`,
+      html: `<p>Your email change code is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
+    });
+
+    return {
+      message: 'A verification code has been sent to your new email address.',
+      ...(process.env.NODE_ENV !== 'production' ? { devOtp: otp } : {}),
+    };
+  }
+
+  async confirmEmailChange(requestUser: { sub: string }, dto: ConfirmEmailChangeDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: requestUser.sub } });
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.assertCanChangeEmail(user.id);
+
+    const candidates = await this.prisma.emailChangeToken.findMany({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    let matched: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(dto.otp, candidate.otpHash)) {
+        matched = candidate;
+        break;
+      }
+    }
+    if (!matched) {
+      throw new BadRequestException('This verification code is invalid or has expired');
+    }
+
+    const pending = matched;
+    const taken = await this.prisma.user.findUnique({ where: { email: pending.newEmail } });
+    if (taken && taken.id !== user.id) {
+      throw new BadRequestException('An account with this email already exists');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const nextUser = await tx.user.update({
+        where: { id: user.id },
+        data: { email: pending.newEmail, emailVerifiedAt: new Date() },
+      });
+      await tx.emailChangeToken.update({ where: { id: pending.id }, data: { usedAt: new Date() } });
+      await tx.emailChangeToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return nextUser;
+    });
+
+    const tokens = await this.createTokens(updated.id, updated.email);
+    await this.storeRefreshToken(updated.id, tokens.refreshToken);
+
+    return {
+      message: 'Email updated successfully.',
+      user: this.publicUser(updated),
+      ...tokens,
+    };
+  }
+
+  private async assertCanChangeEmail(userId: string) {
+    const globalRoles = await this.organizationAccess.getGlobalRoles(userId);
+    if (globalRoles.some((role) => role.code === 'SUPER_ADMIN')) {
+      throw new ForbiddenException('Super admins cannot change their email from this flow');
+    }
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {

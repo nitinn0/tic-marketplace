@@ -22,6 +22,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ProviderCard, SearchBar, ServiceCard } from "@/components/site";
+import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import { api } from "@/lib/api";
 import { EMPTY_HOME, type MarketplaceCategory, type MarketplaceHome } from "@/features/marketplace/types";
 import { cn } from "@/lib/utils";
@@ -108,7 +109,9 @@ const REVIEWS = [
   },
 ];
 
-const STEPS = [
+type Step = { i: LucideIcon; t: string; d: string };
+
+const BUYER_STEPS: Step[] = [
   {
     i: ScanSearch,
     t: "Search services",
@@ -128,6 +131,29 @@ const STEPS = [
     i: Sparkles,
     t: "Compare quotes",
     d: "Quotes come back from multiple providers so you can shortlist on price and scope.",
+  },
+];
+
+const PROVIDER_STEPS: Step[] = [
+  {
+    i: BadgeCheck,
+    t: "Complete your profile",
+    d: "Add your business details, headline and the standards you work with.",
+  },
+  {
+    i: ScanSearch,
+    t: "List your services",
+    d: "Choose the services, industries and locations buyers can match you on.",
+  },
+  {
+    i: EyeOff,
+    t: "Receive masked RFQs",
+    d: "Matching requests show the job, location, sites and headcount. The buyer’s company stays hidden.",
+  },
+  {
+    i: FileText,
+    t: "Quote and follow up",
+    d: "Send scope, exclusions and price. If you are awarded, message the buyer from the platform.",
   },
 ];
 
@@ -523,7 +549,17 @@ const STEP_TONES = [
   "from-[#E36F47] to-[#D35A33]",
 ];
 
-function ScrollStory({ reduced }: { reduced: boolean }) {
+function ScrollStory({
+  reduced,
+  steps,
+  title,
+  description,
+}: {
+  reduced: boolean;
+  steps: Step[];
+  title: string;
+  description: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
@@ -534,7 +570,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
     const total = rect.height - window.innerHeight;
     const p = total > 0 ? Math.min(Math.max(-rect.top / total, 0), 1) : 0;
     el.style.setProperty("--sp", p.toFixed(4));
-    const idx = Math.min(STEPS.length - 1, Math.floor(p * STEPS.length));
+    const idx = Math.min(steps.length - 1, Math.floor(p * steps.length));
     setActive((prev) => (prev === idx ? prev : idx));
   });
 
@@ -542,7 +578,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
     <div
       ref={ref}
       className={cn("relative", reduced ? "hidden" : "hidden lg:block")}
-      style={{ height: `${STEPS.length * 90 + 30}vh` }}
+      style={{ height: `${steps.length * 90 + 30}vh` }}
     >
       <div className="sticky top-0 flex h-screen items-center overflow-hidden bg-gradient-to-br from-[#FBF6F0] via-white to-[#FDEEE6]/60">
         <div aria-hidden className="pointer-events-none absolute -left-24 top-10 h-80 w-80 rounded-full bg-[#7CC0C8]/25 blur-3xl" />
@@ -551,10 +587,8 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
         <div className="relative mx-auto grid w-full max-w-7xl grid-cols-[0.95fr_1.05fr] items-center gap-16 px-6 pt-10">
           <div>
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#17707C]">How it works</p>
-            <h2 className="font-display text-4xl font-bold tracking-tight text-[#12303A]">How sourcing works</h2>
-            <p className="mt-3 max-w-md text-base leading-relaxed text-[#5A6A6F]">
-              Search, send one RFQ, and compare quotes. Providers never see who you are until you engage.
-            </p>
+            <h2 className="font-display text-4xl font-bold tracking-tight text-[#12303A]">{title}</h2>
+            <p className="mt-3 max-w-md text-base leading-relaxed text-[#5A6A6F]">{description}</p>
 
             <ol className="relative mt-10 space-y-3">
               <span aria-hidden className="absolute bottom-6 left-[31px] top-6 w-0.5 bg-[#EADFCF]" />
@@ -563,7 +597,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
                 className="absolute bottom-6 left-[31px] top-6 w-0.5 origin-top bg-gradient-to-b from-[#166B78] to-[#E36F47]"
                 style={{ transform: "scaleY(var(--sp, 0))" }}
               />
-              {STEPS.map(({ i: Icon, t, d }, index) => (
+              {steps.map(({ i: Icon, t, d }, index) => (
                 <li
                   key={t}
                   className={cn(
@@ -602,7 +636,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
                 className="relative h-36 w-36 [transform-style:preserve-3d]"
                 style={{ transform: "rotateX(12deg) rotateY(calc(var(--sp, 0) * 540deg - 30deg))" }}
               >
-                {STEPS.map(({ i: Icon, t }, index) => (
+                {steps.map(({ i: Icon, t }, index) => (
                   <div
                     key={t}
                     className={cn(
@@ -619,7 +653,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
               </div>
 
               <div className="relative mt-12 h-24 w-full max-w-sm">
-                {STEPS.map(({ t, d }, index) => (
+                {steps.map(({ t, d }, index) => (
                   <div
                     key={t}
                     className={cn(
@@ -634,7 +668,7 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
               </div>
 
               <div className="mt-2 flex gap-2">
-                {STEPS.map(({ t }, index) => (
+                {steps.map(({ t }, index) => (
                   <span
                     key={t}
                     className={cn("h-1.5 rounded-full transition-all duration-500", active === index ? "w-8 bg-[#E36F47]" : "w-1.5 bg-[#D9C8B0]")}
@@ -650,6 +684,13 @@ function ScrollStory({ reduced }: { reduced: boolean }) {
 }
 
 export function HomePage() {
+  const { activeOrganization } = useOrganizations();
+  const isProvider = activeOrganization?.organizationType === "PROVIDER";
+  const steps = isProvider ? PROVIDER_STEPS : BUYER_STEPS;
+  const stepsTitle = isProvider ? "How receiving work works" : "How sourcing works";
+  const stepsDescription = isProvider
+    ? "Finish your profile, get matched to RFQs, and quote without seeing the buyer’s company name."
+    : "Search, send one RFQ, and compare quotes. Providers never see who you are until you engage.";
   const [home, setHome] = useState<MarketplaceHome>(EMPTY_HOME);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -907,18 +948,18 @@ export function HomePage() {
 
       {/* HOW IT WORKS: pinned scroll story (lg+), grid fallback */}
       <section className="mt-20 md:mt-28">
-        <ScrollStory reduced={reduced} />
+        <ScrollStory reduced={reduced} steps={steps} title={stepsTitle} description={stepsDescription} />
         <div className={cn("mx-auto max-w-7xl px-4 sm:px-6", reduced ? "" : "lg:hidden")}>
           <Reveal variant="scale">
           <div className="relative overflow-hidden rounded-[1.75rem] border border-[#EADFCF] bg-gradient-to-br from-[#FBF6F0] via-white to-[#FDEEE6]/60 p-6 sm:p-8 md:p-12">
             <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#7CC0C8]/20 blur-3xl" />
             <SectionHeading
               eyebrow="How it works"
-              title="How sourcing works"
-              description="Search, send one RFQ, and compare quotes. Providers never see who you are until you engage."
+              title={stepsTitle}
+              description={stepsDescription}
             />
             <ol className="relative mt-10 grid gap-4 md:grid-cols-4">
-              {STEPS.map(({ i: Icon, t, d }, index) => (
+              {steps.map(({ i: Icon, t, d }, index) => (
                 <li
                   key={t}
                   className="tilt-card relative rounded-2xl border border-white bg-white/85 p-5 shadow-[0_14px_34px_-24px_rgba(18,48,58,0.45)] backdrop-blur-sm"
@@ -1004,7 +1045,12 @@ export function HomePage() {
       {/* DUAL CTA */}
       <section className="mx-auto mt-20 max-w-7xl px-4 pb-28 sm:px-6 md:mt-28 md:pb-32">
         <Reveal variant="scale">
-          <div className="relative grid overflow-hidden rounded-[1.75rem] bg-[#0B3440] text-slate-50 md:grid-cols-2">
+          <div
+            className={cn(
+              "relative grid overflow-hidden rounded-[1.75rem] bg-[#0B3440] text-slate-50",
+              isProvider ? "" : "md:grid-cols-2",
+            )}
+          >
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(27,127,140,0.45),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(227,111,71,0.28),_transparent_50%)]"
@@ -1018,6 +1064,7 @@ export function HomePage() {
                 Request Quote <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
             </div>
+            {isProvider ? null : (
             <div className="relative border-t border-white/10 p-8 md:border-l md:border-t-0 md:p-12">
               <h2 className="font-display text-3xl font-bold tracking-tight">Are you a lab, auditor or consultant?</h2>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-white/75">
@@ -1027,6 +1074,7 @@ export function HomePage() {
                 <Link href="/join">Join as Provider</Link>
               </Button>
             </div>
+            )}
           </div>
         </Reveal>
       </section>

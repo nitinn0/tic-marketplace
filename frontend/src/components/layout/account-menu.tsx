@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import { clearSession, getStoredSession, type SessionUser } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,8 @@ export function AccountMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const { activeOrganization } = useOrganizations();
+  const isProvider = activeOrganization?.organizationType === "PROVIDER";
 
   useEffect(() => {
     setUser(getStoredSession()?.user ?? null);
@@ -211,6 +214,7 @@ export function AccountMenu() {
         ) : null}
       </div>
 
+      {isProvider ? null : (
       <div ref={moreRef} className="relative">
         <button
           type="button"
@@ -253,6 +257,7 @@ export function AccountMenu() {
           </div>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

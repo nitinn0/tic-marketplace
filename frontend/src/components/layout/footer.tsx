@@ -34,6 +34,7 @@ export function Footer() {
   const year = new Date().getFullYear();
   const { activeOrganization, activeContext } = useOrganizations();
   const showIndependents = isProviderAdmin(activeOrganization, activeContext);
+  const isProvider = activeOrganization?.organizationType === "PROVIDER";
 
   return (
     <footer className="relative overflow-hidden bg-[#0B3440] text-white">
@@ -66,12 +67,14 @@ export function Footer() {
             >
               Request Quote <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
-            <Link
-              href="/join"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:border-white/40 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
-              Join as Provider
-            </Link>
+            {isProvider ? null : (
+              <Link
+                href="/join"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:border-white/40 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Join as Provider
+              </Link>
+            )}
           </div>
         </div>
 

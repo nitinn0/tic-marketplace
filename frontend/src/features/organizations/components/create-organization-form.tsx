@@ -63,9 +63,12 @@ export function CreateOrganizationForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Create an organization</h2>
-      <p className="mt-1 text-sm text-slate-600">You will become the owner and organization administrator.</p>
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-3xl border border-[#EADFCF] bg-white p-6 shadow-[0_12px_30px_-22px_rgba(18,48,58,0.45)]"
+    >
+      <h2 className="font-display text-lg font-semibold text-[#12303A]">Create an organization</h2>
+      <p className="mt-1 text-sm text-[#5A6A6F]">You will become the owner and organization administrator.</p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Field label="Legal name" htmlFor="org-legal-name">
@@ -148,10 +151,20 @@ export function CreateOrganizationForm({
       ) : null}
 
       <div className="mt-6 flex justify-end gap-3">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="rounded-xl text-[#0F4C5C] hover:bg-[#E8F4F5]/60"
+          onClick={onCancel}
+          disabled={submitting}
+        >
           Cancel
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button
+          type="submit"
+          className="rounded-xl bg-[#E36F47] text-[#0B2530] hover:bg-[#F2A98B]"
+          disabled={submitting}
+        >
           {submitting ? "Creating..." : "Create organization"}
         </Button>
       </div>

@@ -36,11 +36,11 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-3xl border border-[#EADFCF] bg-white p-6 shadow-[0_12px_30px_-22px_rgba(18,48,58,0.45)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
+          <h2 className="font-display text-lg font-semibold text-[#12303A]">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-[#5A6A6F]">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -74,7 +74,13 @@ export function CapabilitySection({
       description={description}
       action={
         canEdit && !editing ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-[#EADFCF] text-[#0F4C5C] hover:border-[#7CC0C8] hover:bg-[#E8F4F5]/50"
+            onClick={() => setEditing(true)}
+          >
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Edit
           </Button>

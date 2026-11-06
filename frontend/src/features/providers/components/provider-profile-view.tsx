@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 
+import { Container } from "@/components/common/container";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
 import { LoadingState } from "@/components/common/loading-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useApiResource } from "@/features/organizations/hooks/use-api-resource";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import type { OrganizationContext } from "@/features/organizations/types";
@@ -22,29 +22,99 @@ import { CapabilitySection, SectionCard, type CapabilityOption } from "./capabil
 import { LocationsSection } from "./locations-section";
 import { ProviderBasicForm } from "./provider-basic-form";
 
+const GHOST_BTN =
+  "inline-flex items-center justify-center gap-2 rounded-xl border border-[#EADFCF] bg-white px-3 py-2 text-sm font-semibold text-[#0F4C5C] transition hover:border-[#7CC0C8] hover:bg-[#E8F4F5]/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F4C5C]";
+
+function ProfileShell({
+  title,
+  description,
+  extra,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  extra?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <section className="relative overflow-hidden bg-[#0B3440] text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(27,127,140,0.5),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(227,111,71,0.26),_transparent_45%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:36px_36px] [mask-image:radial-gradient(ellipse_at_center,black_25%,transparent_75%)]"
+        />
+        <Container className="relative py-10 md:py-12">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-white/60">
+            <Link href={routes.providerDashboard} className="transition hover:text-white">
+              Dashboard
+            </Link>
+            <ChevronRight className="h-3 w-3" aria-hidden />
+            <span className="text-white/90">Profile</span>
+          </nav>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-[#F2A98B]">Provider profile</p>
+          <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">{title}</h1>
+              {description ? <div className="mt-3 max-w-2xl text-sm leading-relaxed text-white/75">{description}</div> : null}
+            </div>
+            {extra ? <div className="flex flex-wrap gap-2">{extra}</div> : null}
+          </div>
+        </Container>
+      </section>
+      <Container className="py-8 md:py-10">{children}</Container>
+    </>
+  );
+}
+
 /** Provider profile of the active organization (selected in the header organization switcher). */
 export function ProviderProfileView() {
   const { status, error, activeOrganization, activeContext } = useOrganizations();
 
-  if (status === "loading" || status === "anonymous") return <LoadingState label="Loading your organizations..." />;
-  if (status === "error") return <ErrorState title="Unable to load your organizations" description={error ?? undefined} />;
+  if (status === "loading" || status === "anonymous") {
+    return (
+      <ProfileShell title="Provider profile" description="Loading the organization selected in the header.">
+        <LoadingState label="Loading your organizations..." />
+      </ProfileShell>
+    );
+  }
+  if (status === "error") {
+    return (
+      <ProfileShell title="Provider profile">
+        <ErrorState title="Unable to load your organizations" description={error ?? undefined} />
+      </ProfileShell>
+    );
+  }
   if (!activeOrganization) {
     return (
-      <EmptyState
-        title="No active organization"
-        description="Create or join a provider organization, then select it in the organization switcher."
-      />
+      <ProfileShell title="Provider profile" description="Select a provider organization to manage its public profile.">
+        <EmptyState
+          title="No active organization"
+          description="Create or join a provider organization, then select it in the organization switcher."
+        />
+      </ProfileShell>
     );
   }
   if (activeOrganization.organizationType !== "PROVIDER") {
     return (
-      <EmptyState
-        title="Provider profiles are for provider organizations"
-        description={`${activeOrganization.displayName} is a buyer organization. Switch to a provider organization to manage its profile.`}
-      />
+      <ProfileShell title={activeOrganization.displayName} description="This workspace is a buyer organization.">
+        <EmptyState
+          title="Provider profiles are for provider organizations"
+          description={`${activeOrganization.displayName} is a buyer organization. Switch to a provider organization to manage its profile.`}
+        />
+      </ProfileShell>
     );
   }
-  if (!activeContext) return <LoadingState label="Loading your permissions..." />;
+  if (!activeContext) {
+    return (
+      <ProfileShell title={activeOrganization.displayName}>
+        <LoadingState label="Loading your permissions..." />
+      </ProfileShell>
+    );
+  }
 
   return <ProviderWorkspace key={activeOrganization.id} context={activeContext} />;
 }
@@ -63,49 +133,89 @@ function ProviderWorkspace({ context }: { context: OrganizationContext }) {
   const catalog = useApiResource(() => providersService.catalog(organizationId), [organizationId]);
 
   if (!can(P.profile, "view")) {
-    return <ErrorState title="Access denied" description="Your roles in this organization do not include the provider profile." />;
+    return (
+      <ProfileShell title={context.organization.displayName}>
+        <ErrorState title="Access denied" description="Your roles in this organization do not include the provider profile." />
+      </ProfileShell>
+    );
   }
-  if (profile.loading) return <LoadingState label="Loading provider profile..." />;
+  if (profile.loading) {
+    return (
+      <ProfileShell title={context.organization.displayName}>
+        <LoadingState label="Loading provider profile..." />
+      </ProfileShell>
+    );
+  }
 
   if (profile.status === 404) {
-    return can(P.profile, "create") ? (
-      <SectionCard
-        title={`Create the provider profile for ${context.organization.displayName}`}
+    return (
+      <ProfileShell
+        title={context.organization.displayName}
         description="Describe your organization. You can add services, standards, industries and locations afterwards."
       >
-        <ProviderBasicForm
-          profile={null}
-          submitLabel="Create profile"
-          onSubmit={async (input) => {
-            await providersService.createProfile(organizationId, input);
-            await profile.reload();
-          }}
-        />
-      </SectionCard>
-    ) : (
-      <EmptyState
-        title="No provider profile yet"
-        description="An organization administrator needs to create the provider profile."
-      />
+        {can(P.profile, "create") ? (
+          <SectionCard
+            title="Create the provider profile"
+            description="This profile is what buyers see after you opt in to the public marketplace."
+          >
+            <ProviderBasicForm
+              profile={null}
+              submitLabel="Create profile"
+              onSubmit={async (input) => {
+                await providersService.createProfile(organizationId, input);
+                await profile.reload();
+              }}
+            />
+          </SectionCard>
+        ) : (
+          <EmptyState
+            title="No provider profile yet"
+            description="An organization administrator needs to create the provider profile."
+          />
+        )}
+      </ProfileShell>
     );
   }
   if (profile.error || !profile.data) {
-    return <ErrorState title="Unable to load the provider profile" description={profile.error ?? undefined} />;
+    return (
+      <ProfileShell title={context.organization.displayName}>
+        <ErrorState title="Unable to load the provider profile" description={profile.error ?? undefined} />
+      </ProfileShell>
+    );
   }
 
+  const data = profile.data;
   return (
-    <ProviderProfileDetails
-      profile={profile.data}
-      catalog={catalog.data}
-      catalogError={catalog.error}
-      readOnlyReason={
-        context.organization.status !== "ACTIVE" && !context.hasPlatformAccess
-          ? `This organization is ${context.organization.status.toLowerCase()}, so its profile is read-only.`
-          : null
+    <ProfileShell
+      title={data.organization.displayName}
+      description={
+        <Link href={routes.organization(data.organizationId)} className="hover:text-white">
+          {data.organization.legalName}
+        </Link>
       }
-      can={can}
-      onChanged={profile.reload}
-    />
+      extra={
+        <>
+          <Badge tone="info">{formatProviderTypes(data.providerTypes)}</Badge>
+          <Badge tone={profileVerificationTones[data.verificationStatus]}>
+            {profileVerificationLabels[data.verificationStatus]}
+          </Badge>
+          <Badge tone={data.publicProfile ? "success" : "neutral"}>{data.publicProfile ? "Public" : "Private"}</Badge>
+        </>
+      }
+    >
+      <ProviderProfileDetails
+        profile={data}
+        catalog={catalog.data}
+        catalogError={catalog.error}
+        readOnlyReason={
+          context.organization.status !== "ACTIVE" && !context.hasPlatformAccess
+            ? `This organization is ${context.organization.status.toLowerCase()}, so its profile is read-only.`
+            : null
+        }
+        can={can}
+        onChanged={profile.reload}
+      />
+    </ProfileShell>
   );
 }
 
@@ -146,25 +256,6 @@ function ProviderProfileDetails({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Provider profile</p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">{profile.organization.displayName}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            <Link href={routes.organization(organizationId)} className="hover:text-sky-700">
-              {profile.organization.legalName}
-            </Link>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="info">{formatProviderTypes(profile.providerTypes)}</Badge>
-          <Badge tone={profileVerificationTones[profile.verificationStatus]}>
-            {profileVerificationLabels[profile.verificationStatus]}
-          </Badge>
-          <Badge tone={profile.publicProfile ? "success" : "neutral"}>{profile.publicProfile ? "Public" : "Private"}</Badge>
-        </div>
-      </div>
-
       {readOnlyReason ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{readOnlyReason}</p>
       ) : null}
@@ -179,10 +270,10 @@ function ProviderProfileDetails({
         title="Basic information"
         action={
           can(P.profile, "edit") && !editingBasic ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setEditingBasic(true)}>
-              <Pencil className="h-4 w-4" aria-hidden="true" />
+            <button type="button" className={GHOST_BTN} onClick={() => setEditingBasic(true)}>
+              <Pencil className="h-4 w-4" aria-hidden />
               Edit
-            </Button>
+            </button>
           ) : null
         }
       >
@@ -199,16 +290,16 @@ function ProviderProfileDetails({
           />
         ) : (
           <dl className="grid gap-x-6 gap-y-3 text-sm md:grid-cols-[12rem_1fr]">
-            <dt className="text-slate-500">Provider type</dt>
-            <dd className="text-slate-900">{formatProviderTypes(profile.providerTypes)}</dd>
-            <dt className="text-slate-500">Headline</dt>
-            <dd className="text-slate-900">{profile.headline || "—"}</dd>
-            <dt className="text-slate-500">Description</dt>
-            <dd className="whitespace-pre-line text-slate-900">{profile.description || "—"}</dd>
-            <dt className="text-slate-500">Years in business</dt>
-            <dd className="text-slate-900">{profile.yearsInBusiness ?? "—"}</dd>
-            <dt className="text-slate-500">Visibility</dt>
-            <dd className="text-slate-900">{profile.publicProfile ? "Public (opted in)" : "Private"}</dd>
+            <dt className="text-[#5A6A6F]">Provider type</dt>
+            <dd className="text-[#12303A]">{formatProviderTypes(profile.providerTypes)}</dd>
+            <dt className="text-[#5A6A6F]">Headline</dt>
+            <dd className="text-[#12303A]">{profile.headline || "—"}</dd>
+            <dt className="text-[#5A6A6F]">Description</dt>
+            <dd className="whitespace-pre-line text-[#12303A]">{profile.description || "—"}</dd>
+            <dt className="text-[#5A6A6F]">Years in business</dt>
+            <dd className="text-[#12303A]">{profile.yearsInBusiness ?? "—"}</dd>
+            <dt className="text-[#5A6A6F]">Visibility</dt>
+            <dd className="text-[#12303A]">{profile.publicProfile ? "Public (opted in)" : "Private"}</dd>
           </dl>
         )}
       </SectionCard>

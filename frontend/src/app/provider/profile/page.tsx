@@ -1,12 +1,11 @@
 "use client";
 
-import { Container } from "@/components/common/container";
 import { ProviderProfileView } from "@/features/providers/components/provider-profile-view";
 
 export default function ProviderProfilePage() {
   return (
-    <Container className="py-12">
+    <div className="bg-[#FBF6F0]">
       <ProviderProfileView />
-    </Container>
+    </div>
   );
 }

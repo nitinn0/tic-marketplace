@@ -509,6 +509,16 @@ export default function JoinPage() {
             </div>
           )}
 
+<AuthField label="Primary accreditation" htmlFor="accreditation">
+            <AuthInput
+              id="accreditation"
+              maxLength={200}
+              value={accreditation}
+              onChange={(event) => setAccreditation(event.target.value)}
+              placeholder="Primary accreditation (e.g. NABL TC-1234, IRCA Lead Auditor)"
+            />
+          </AuthField>
+
           <AuthField label="Headline" htmlFor="headline">
             <AuthInput
               id="headline"
@@ -534,15 +544,7 @@ export default function JoinPage() {
             />
           </AuthField>
 
-          <AuthField label="Primary accreditation" htmlFor="accreditation">
-            <AuthInput
-              id="accreditation"
-              maxLength={200}
-              value={accreditation}
-              onChange={(event) => setAccreditation(event.target.value)}
-              placeholder="Primary accreditation (e.g. NABL TC-1234, IRCA Lead Auditor)"
-            />
-          </AuthField>
+     
 
           {error ? (
             <div

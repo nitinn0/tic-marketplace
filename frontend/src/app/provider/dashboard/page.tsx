@@ -173,9 +173,11 @@ export default function ProviderDashboardPage() {
                 {me ? `Welcome back, ${me.user.firstName}` : "Provider dashboard"}
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75">
-                {activeOrganization
-                  ? `Keep ${activeOrganization.displayName} ready for incoming requests.`
-                  : "Create a provider organization to start receiving RFQs."}
+                {profile?.headline?.trim()
+                  ? profile.headline.trim()
+                  : activeOrganization
+                    ? `Keep ${activeOrganization.displayName} ready for incoming requests.`
+                    : "Create a provider organization to start receiving RFQs."}
               </p>
             </div>
             <button

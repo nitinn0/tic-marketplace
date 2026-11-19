@@ -7,6 +7,7 @@ import type {
   ProviderLocationItem,
   ProviderProfile,
   ProviderProfileInput,
+  ProviderSelectServicesInput,
   ProviderServiceItem,
   ProviderStandardItem,
 } from "../types";
@@ -24,6 +25,9 @@ export const providersService = {
   updateProfile: (organizationId: string, input: ProviderProfileInput) =>
     api.patch<ProviderProfile>("/provider/profile", input, scoped(organizationId)),
   catalog: (organizationId: string) => api.get<ProviderCatalog>("/provider/catalog", scoped(organizationId)),
+  /** Public active category/service tree for join onboarding (no org header). */
+  onboardingCatalog: () =>
+    api.get<Pick<ProviderCatalog, "categories" | "services">>("/marketplace/onboarding-catalog"),
 
   publishService: (
     organizationId: string,
@@ -38,6 +42,8 @@ export const providersService = {
     }
     return api.postForm<ProviderServiceItem[]>("/provider/profile/services/publish", form, scoped(organizationId));
   },
+  selectServices: (organizationId: string, input: ProviderSelectServicesInput) =>
+    api.post<ProviderServiceItem[]>("/provider/profile/services/select", input, scoped(organizationId)),
   replaceServices: (organizationId: string, serviceIds: string[]) =>
     api.put<ProviderServiceItem[]>("/provider/profile/services", { serviceIds }, scoped(organizationId)),
   removeService: (organizationId: string, serviceId: string) =>

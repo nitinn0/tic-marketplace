@@ -18,6 +18,12 @@ export class MarketplaceController {
     return this.catalog.home();
   }
 
+  /** Active category/service tree for provider join onboarding (no auth required). */
+  @Get('onboarding-catalog')
+  onboardingCatalog() {
+    return this.catalog.onboardingCatalog();
+  }
+
   @Get('services')
   services(@Query() query: MarketplaceServicesQueryDto) {
     return this.catalog.listServices(query);

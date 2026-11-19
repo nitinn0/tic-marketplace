@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -40,6 +39,7 @@ import {
   ReplaceProviderLocationsDto,
   ReplaceProviderServicesDto,
   ReplaceProviderStandardsDto,
+  SelectProviderServicesDto,
 } from './dto/provider-capabilities.dto.js';
 import { CreateProviderProfileDto, UpdateProviderProfileDto } from './dto/provider-profile.dto.js';
 import { ProviderCapabilitiesService } from './services/provider-capabilities.service.js';
@@ -109,6 +109,20 @@ export class ProviderController {
     return this.capabilities.replace(context.organization.id, user.sub, 'services', dto.serviceIds.map((id) => ({ id })));
   }
 
+  @Post('profile/services/select')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(P.services, 'edit')
+  selectServices(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SelectProviderServicesDto,
+  ) {
+    return this.capabilities.selectServices(context.organization.id, user.sub, {
+      serviceIds: dto.serviceIds,
+      customServices: dto.customServices,
+    });
+  }
+
   @Post('profile/services/publish')
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission(P.services, 'edit')
@@ -125,9 +139,6 @@ export class ProviderController {
     @UploadedFiles() files: { documents?: Express.Multer.File[] },
   ) {
     const documents = files?.documents ?? [];
-    if (documents.length === 0) {
-      throw new BadRequestException('At least one supporting document is required');
-    }
     return this.capabilities.publish(
       context.organization.id,
       user.sub,

@@ -12,6 +12,7 @@ import { absoluteStoragePath } from '../../common/uploads/service-document-stora
 import { PrismaService } from '../../database/prisma.service.js';
 import { PUBLIC_PROFESSIONAL_PROFILE_WHERE } from '../professionals/professional-visibility.js';
 import { PUBLIC_PROVIDER_PROFILE_WHERE } from '../providers/provider-visibility.js';
+import { TaxonomyLookupService } from '../taxonomy/services/taxonomy-lookup.service.js';
 import { locationLabel } from '../taxonomy/utils/location.util.js';
 import { ancestorsOf, buildTreeIndex, descendantIdsOf, isEffectivelyActive } from '../taxonomy/utils/tree.util.js';
 import { MarketplaceServicesQueryDto } from './dto/marketplace-query.dto.js';
@@ -53,7 +54,19 @@ type PublicProfessional = ProfessionalProfile & {
 
 @Injectable()
 export class MarketplaceCatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly taxonomy: TaxonomyLookupService,
+  ) {}
+
+  /** Categories + services used by the provider join cascade picker. */
+  async onboardingCatalog() {
+    const catalog = await this.taxonomy.providerCatalog();
+    return {
+      categories: catalog.categories,
+      services: catalog.services,
+    };
+  }
 
   async home() {
     const [categories, services, providers, industries] = await Promise.all([

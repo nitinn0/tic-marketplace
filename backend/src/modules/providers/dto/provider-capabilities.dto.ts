@@ -21,12 +21,42 @@ export class PublishProviderServiceDto {
   description?: string;
 }
 
+export class CustomProviderServiceDto {
+  @IsUUID()
+  categoryId: string;
+
+  @IsString()
+  @Length(2, 160)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+}
+
 export class ReplaceProviderServicesDto {
   @IsArray()
   @ArrayMaxSize(MAX_ITEMS)
   @ArrayUnique({ message: `serviceIds ${DUPLICATES}` })
   @IsUUID('all', { each: true })
   serviceIds: string[];
+}
+
+/** Assign catalogue services and optionally create provider-defined services under a subcategory. */
+export class SelectProviderServicesDto {
+  @IsArray()
+  @ArrayMaxSize(MAX_ITEMS)
+  @ArrayUnique({ message: `serviceIds ${DUPLICATES}` })
+  @IsUUID('all', { each: true })
+  serviceIds: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CustomProviderServiceDto)
+  customServices?: CustomProviderServiceDto[];
 }
 
 export class ReplaceProviderStandardsDto {

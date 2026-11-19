@@ -115,27 +115,12 @@ export class ProviderCapabilitiesService {
     organizationId: string,
     actorId: string,
     input: { categoryId: string; name: string; description?: string | null },
-    documents: UploadedServiceDocument[],
+    documents: UploadedServiceDocument[] = [],
   ) {
-    assertServiceDocuments(documents);
+    assertServiceDocuments(documents, { required: false });
     const providerId = await this.requireProfileId(organizationId);
-    const index = await this.lookup.categoryIndex();
-    if (!isEffectivelyActive(index, input.categoryId)) {
-      throw new BadRequestException('Choose an active category');
-    }
+    const serviceId = await this.ensureCatalogueService(actorId, input);
 
-    const name = input.name.trim().replace(/\s+/g, ' ');
-    const description = input.description?.trim() || null;
-    const existing = await this.prisma.service.findFirst({
-      where: { categoryId: input.categoryId, name: { equals: name, mode: 'insensitive' } },
-    });
-    const serviceId = existing
-      ? existing.id
-      : await this.createCatalogueService(actorId, input.categoryId, name, description);
-
-    if (existing && !existing.active) {
-      throw new BadRequestException('This service exists but is inactive');
-    }
     if (
       await this.prisma.providerService.findUnique({
         where: { providerId_serviceId: { providerId, serviceId } },
@@ -146,27 +131,79 @@ export class ProviderCapabilitiesService {
 
     await this.add(organizationId, actorId, 'services', { id: serviceId });
 
-    let storageKeys: string[] = [];
-    try {
-      const saved = await persistServiceDocuments(organizationId, serviceId, documents);
-      storageKeys = saved.map((row) => row.storageKey);
-      await this.prisma.providerServiceDocument.createMany({
-        data: saved.map((row) => ({
-          providerId,
-          serviceId,
-          originalName: row.originalName,
-          mimeType: row.mimeType,
-          sizeBytes: row.sizeBytes,
-          storageKey: row.storageKey,
-        })),
-      });
-    } catch (error) {
-      await deleteStoredFiles(storageKeys);
-      throw error;
+    if (documents.length > 0) {
+      let storageKeys: string[] = [];
+      try {
+        const saved = await persistServiceDocuments(organizationId, serviceId, documents);
+        storageKeys = saved.map((row) => row.storageKey);
+        await this.prisma.providerServiceDocument.createMany({
+          data: saved.map((row) => ({
+            providerId,
+            serviceId,
+            originalName: row.originalName,
+            mimeType: row.mimeType,
+            sizeBytes: row.sizeBytes,
+            storageKey: row.storageKey,
+          })),
+        });
+      } catch (error) {
+        await deleteStoredFiles(storageKeys);
+        throw error;
+      }
     }
 
     await this.prisma.providerProfile.update({ where: { id: providerId }, data: { publicProfile: true } });
     return this.listServices(providerId);
+  }
+
+  /** Replaces the assigned catalogue services and creates any provider-defined services under subcategories. */
+  async selectServices(
+    organizationId: string,
+    actorId: string,
+    input: {
+      serviceIds: string[];
+      customServices?: Array<{ categoryId: string; name: string; description?: string | null }>;
+    },
+  ) {
+    const providerId = await this.requireProfileId(organizationId);
+    const customIds: string[] = [];
+    for (const custom of input.customServices ?? []) {
+      customIds.push(await this.ensureCatalogueService(actorId, custom));
+    }
+    const serviceIds = [...new Set([...input.serviceIds, ...customIds])];
+    await this.replace(
+      organizationId,
+      actorId,
+      'services',
+      serviceIds.map((id) => ({ id })),
+    );
+    await this.prisma.providerProfile.update({ where: { id: providerId }, data: { publicProfile: true } });
+    return this.listServices(providerId);
+  }
+
+  private async ensureCatalogueService(
+    actorId: string,
+    input: { categoryId: string; name: string; description?: string | null },
+  ) {
+    const index = await this.lookup.categoryIndex();
+    if (!isEffectivelyActive(index, input.categoryId)) {
+      throw new BadRequestException('Choose an active subcategory');
+    }
+    const category = index.byId.get(input.categoryId);
+    if (!category?.parentId) {
+      throw new BadRequestException('Choose a subcategory, not a top-level category');
+    }
+
+    const name = input.name.trim().replace(/\s+/g, ' ');
+    const description = input.description?.trim() || null;
+    const existing = await this.prisma.service.findFirst({
+      where: { categoryId: input.categoryId, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (existing) {
+      if (!existing.active) throw new BadRequestException('This service exists but is inactive');
+      return existing.id;
+    }
+    return this.createCatalogueService(actorId, input.categoryId, name, description);
   }
 
   async add(organizationId: string, actorId: string, kind: CapabilityKind, entry: CapabilityEntry) {

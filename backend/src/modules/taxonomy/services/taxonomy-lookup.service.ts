@@ -124,6 +124,8 @@ export class TaxonomyLookupService {
           id: node.id,
           name: node.name,
           slug: node.slug,
+          parentId: node.parentId,
+          categoryType: node.categoryType,
           depth,
           path: this.categoryPath(categoryIndex, node.id),
         })),
@@ -136,6 +138,7 @@ export class TaxonomyLookupService {
             id: service.id,
             name: service.name,
             slug: service.slug,
+            categoryId: service.categoryId,
             category: { id: category.id, name: category.name, categoryType: category.categoryType },
             categoryPath: this.categoryPath(categoryIndex, service.categoryId),
           };

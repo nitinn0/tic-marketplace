@@ -90,18 +90,42 @@ export type ProviderProfileInput = {
   publicProfile?: boolean;
 };
 
+export type ProviderCatalogCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+  categoryType?: CategoryType;
+  depth: number;
+  path: string[];
+};
+
+export type ProviderCatalogService = {
+  id: string;
+  name: string;
+  slug: string;
+  categoryId?: string;
+  category: { id: string; name: string; categoryType: CategoryType };
+  categoryPath: string[];
+};
+
 export type ProviderCatalog = {
-  categories: Array<{ id: string; name: string; slug: string; depth: number; path: string[] }>;
-  services: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    category: { id: string; name: string; categoryType: CategoryType };
-    categoryPath: string[];
-  }>;
+  categories: ProviderCatalogCategory[];
+  services: ProviderCatalogService[];
   standards: Array<{ id: string; code: string; name: string; version: string | null }>;
   industries: Array<{ id: string; parentId: string | null; name: string; slug: string; depth: number; path: string[] }>;
   locations: LocationSummary[];
+};
+
+export type ProviderCustomServiceInput = {
+  categoryId: string;
+  name: string;
+  description?: string;
+};
+
+export type ProviderSelectServicesInput = {
+  serviceIds: string[];
+  customServices?: ProviderCustomServiceInput[];
 };
 
 export type LocationSelection = { locationId: string; coverageType: CoverageType | null };

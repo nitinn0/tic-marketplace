@@ -16,12 +16,17 @@ import { AuthShell } from "@/features/auth/components/auth-shell";
 import { organizationsService } from "@/features/organizations/services/organizations.service";
 import { professionalsService } from "@/features/professionals/services/professionals.service";
 import type { ProfessionalType } from "@/features/professionals/types";
+import {
+  ServiceCascadePicker,
+  type CustomServiceDraft,
+} from "@/features/providers/components/service-cascade-picker";
 import { providersService } from "@/features/providers/services/providers.service";
-import type { ProviderType } from "@/features/providers/types";
+import type { ProviderCatalog, ProviderType } from "@/features/providers/types";
 import {
   COMPANY_CLASSIFICATION_BLOCKED_MESSAGE,
   containsCompanyClassification,
 } from "@/features/providers/utils/company-classification";
+import { providerTypesFromSelection } from "@/features/providers/utils/provider-types-from-catalog";
 import { ApiError, api, setActiveOrganizationId, usesSupabaseAuth } from "@/lib/api";
 import { clearSession, getStoredSession, saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
@@ -44,11 +49,30 @@ type RegisterResponse = {
 type JoinKind = "organisation" | "independent";
 
 const JOIN_CATEGORIES = [
-  { id: "testing", label: "Testing", providerType: "TESTING_LAB" as ProviderType, professionalType: "TECHNICAL_EXPERT" as ProfessionalType },
-  { id: "inspection", label: "Inspection", providerType: "INSPECTION_COMPANY" as ProviderType, professionalType: "INSPECTOR" as ProfessionalType },
-  { id: "certification", label: "Certification", providerType: "CERTIFICATION_BODY" as ProviderType, professionalType: "LEAD_AUDITOR" as ProfessionalType },
-  { id: "esg", label: "Sustainability & ESG", providerType: "CONSULTANCY" as ProviderType, professionalType: "CONSULTANT" as ProfessionalType },
-  { id: "professional", label: "Professional Services", providerType: "CONSULTANCY" as ProviderType, professionalType: "CONSULTANT" as ProfessionalType },
+  {
+    id: "testing",
+    label: "Testing",
+    providerType: "TESTING_LAB" as ProviderType,
+    professionalType: "TECHNICAL_EXPERT" as ProfessionalType,
+  },
+  {
+    id: "inspection",
+    label: "Inspection",
+    providerType: "INSPECTION_COMPANY" as ProviderType,
+    professionalType: "INSPECTOR" as ProfessionalType,
+  },
+  {
+    id: "certification",
+    label: "Certification",
+    providerType: "CERTIFICATION_BODY" as ProviderType,
+    professionalType: "LEAD_AUDITOR" as ProfessionalType,
+  },
+  {
+    id: "professional-services",
+    label: "Professional Services",
+    providerType: "CONSULTANCY" as ProviderType,
+    professionalType: "CONSULTANT" as ProfessionalType,
+  },
 ] as const;
 
 const BASE_CITIES = [
@@ -91,6 +115,10 @@ export default function JoinPage() {
   const [fullName, setFullName] = useState("");
   const [baseCity, setBaseCity] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<Pick<ProviderCatalog, "categories" | "services"> | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [customServices, setCustomServices] = useState<CustomServiceDraft[]>([]);
   const [headline, setHeadline] = useState("");
   const [about, setAbout] = useState("");
   const [accreditation, setAccreditation] = useState("");
@@ -101,23 +129,56 @@ export default function JoinPage() {
     setSignedIn(Boolean(getStoredSession()));
   }, []);
 
+  useEffect(() => {
+    if (kind !== "organisation") return;
+    let cancelled = false;
+    providersService
+      .onboardingCatalog()
+      .then((data) => {
+        if (!cancelled) {
+          setCatalog(data);
+          setCatalogError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setCatalogError(err instanceof Error ? err.message : "Unable to load service catalogue");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [kind]);
+
   const selectedCategories = useMemo(
     () => JOIN_CATEGORIES.filter((entry) => categories.includes(entry.id)),
     [categories],
   );
 
+  const hasOrgServices = selectedServiceIds.length > 0 || customServices.length > 0;
+
   const canSubmit = useMemo(() => {
-    if (!baseCity || categories.length === 0) return false;
+    if (!baseCity) return false;
     if (kind === "organisation") {
       if (organisationName.trim().length < 2) return false;
-    } else if (fullName.trim().length < 3) {
-      return false;
+      if (!hasOrgServices) return false;
+    } else {
+      if (fullName.trim().length < 3) return false;
+      if (categories.length === 0) return false;
     }
     if (!signedIn) {
       if (!email.trim().includes("@") || password.length < 8) return false;
     }
     return true;
-  }, [baseCity, categories.length, email, fullName, kind, organisationName, password, signedIn]);
+  }, [
+    baseCity,
+    categories.length,
+    email,
+    fullName,
+    hasOrgServices,
+    kind,
+    organisationName,
+    password,
+    signedIn,
+  ]);
 
   function toggleCategory(id: string) {
     setCategories((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -171,18 +232,31 @@ export default function JoinPage() {
     setActiveOrganizationId(organization.id);
     await organizationsService.switch(organization.id);
 
-    const providerTypes = Array.from(new Set(selectedCategories.map((entry) => entry.providerType)));
+    const providerTypes = providerTypesFromSelection(
+      catalog,
+      selectedServiceIds,
+      customServices.map((entry) => entry.categoryId),
+    );
     try {
       await providersService.createProfile(organization.id, {
-        providerTypes: providerTypes.length ? providerTypes : ["OTHER"],
+        providerTypes,
         headline: headline.trim() || null,
         description: about.trim() || null,
         publicProfile: true,
       });
     } catch (err) {
-      // Profile may already exist if the org was partially onboarded; continue to the profile page.
+      // Profile may already exist if the org was partially onboarded; continue to service selection.
       if (!(err instanceof ApiError && err.status === 409)) throw err;
     }
+
+    await providersService.selectServices(organization.id, {
+      serviceIds: selectedServiceIds,
+      customServices: customServices.map(({ categoryId, name, description }) => ({
+        categoryId,
+        name,
+        description,
+      })),
+    });
 
     router.push(routes.providerProfile);
     router.refresh();
@@ -363,30 +437,48 @@ export default function JoinPage() {
             </select>
           </AuthField>
 
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-slate-700">Categories</p>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
-              {JOIN_CATEGORIES.map((category) => {
-                const active = categories.includes(category.id);
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => toggleCategory(category.id)}
-                    className={cn(
-                      "rounded-full border px-3.5 py-1.5 text-sm font-medium transition",
-                      active
-                        ? "border-[#0F4C5C] bg-[#E8F4F5] text-[#0F4C5C]"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
-                    )}
-                  >
-                    {category.label}
-                  </button>
-                );
-              })}
+          {kind === "organisation" ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">Services you provide</p>
+              <p className="text-xs text-slate-500">
+                Select one or more of the four categories, then subcategories, then services. Add a new service if needed.
+              </p>
+              <ServiceCascadePicker
+                catalog={catalog}
+                selectedServiceIds={selectedServiceIds}
+                onSelectedServiceIdsChange={setSelectedServiceIds}
+                customServices={customServices}
+                onCustomServicesChange={setCustomServices}
+                disabled={loading}
+              />
+              {catalogError ? <p className="text-sm text-red-700">{catalogError}</p> : null}
             </div>
-          </div>
+          ) : (
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-slate-700">Categories</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
+                {JOIN_CATEGORIES.map((category) => {
+                  const active = categories.includes(category.id);
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => toggleCategory(category.id)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-sm font-medium transition",
+                        active
+                          ? "border-[#0F4C5C] bg-[#E8F4F5] text-[#0F4C5C]"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
+                      )}
+                    >
+                      {category.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <AuthField label="Headline" htmlFor="headline">
             <AuthInput

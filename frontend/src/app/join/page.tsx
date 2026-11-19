@@ -132,17 +132,46 @@ export default function JoinPage() {
   useEffect(() => {
     if (kind !== "organisation") return;
     let cancelled = false;
-    providersService
-      .onboardingCatalog()
-      .then((data) => {
-        if (!cancelled) {
+
+    async function loadCatalog() {
+      try {
+        const data = await providersService.onboardingCatalog();
+        if (cancelled) return;
+        if (!data.categories?.length) {
+          setCatalog(data);
+          setCatalogError("Service catalogue is empty. Seed categories in the backend, then refresh.");
+          return;
+        }
+        setCatalog(data);
+        setCatalogError(null);
+      } catch (primaryError) {
+        // Nest may be down locally — try the Next.js same-origin marketplace proxy.
+        try {
+          const response = await fetch("/api/v1/marketplace/onboarding-catalog");
+          if (!response.ok) throw primaryError;
+          const data = (await response.json()) as Pick<ProviderCatalog, "categories" | "services">;
+          if (cancelled) return;
+          if (!data.categories?.length) {
+            setCatalog(data);
+            setCatalogError("Service catalogue is empty. Seed categories in the backend, then refresh.");
+            return;
+          }
           setCatalog(data);
           setCatalogError(null);
+        } catch {
+          if (!cancelled) {
+            setCatalog(null);
+            setCatalogError(
+              primaryError instanceof Error
+                ? primaryError.message
+                : "Unable to load service catalogue. Start the API (port 4011) and refresh.",
+            );
+          }
         }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setCatalogError(err instanceof Error ? err.message : "Unable to load service catalogue");
-      });
+      }
+    }
+
+    void loadCatalog();
     return () => {
       cancelled = true;
     };

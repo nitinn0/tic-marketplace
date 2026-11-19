@@ -354,6 +354,47 @@ function providerCountFor(serviceId: string, providers: CatalogProvider[]) {
   return providers.filter((provider) => provider.services.some((service) => service.id === serviceId)).length;
 }
 
+async function marketplaceOnboardingCatalog() {
+  const catalog = await loadCatalog();
+  const services = activeServices(catalog);
+  const categoryOrder = new Map(depthFirst(catalog.index).map(({ node }, position) => [node.id, position]));
+
+  return {
+    categories: depthFirst(catalog.index)
+      .filter(({ node }) => effectivelyActive(catalog.index, node.id))
+      .map(({ node, depth }) => ({
+        id: node.id,
+        name: node.name,
+        slug: node.slug,
+        parentId: node.parentId,
+        categoryType: node.categoryType,
+        depth,
+        path: [...ancestorsOf(catalog.index, node.id).map((ancestor) => ancestor.name), node.name],
+      })),
+    services: services
+      .filter((service) => effectivelyActive(catalog.index, service.categoryId))
+      .sort((a, b) => (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0))
+      .map((service) => {
+        const category = catalog.index.byId.get(service.categoryId);
+        return {
+          id: service.id,
+          name: service.name,
+          slug: service.slug,
+          categoryId: service.categoryId,
+          category: {
+            id: service.categoryId,
+            name: category?.name ?? service.categoryName,
+            categoryType: (category?.categoryType ?? service.categoryType) as string,
+          },
+          categoryPath: [
+            ...ancestorsOf(catalog.index, service.categoryId).map((ancestor) => ancestor.name),
+            category?.name ?? service.categoryName,
+          ].filter(Boolean),
+        };
+      }),
+  };
+}
+
 async function marketplaceHome() {
   const catalog = await loadCatalog();
   const services = activeServices(catalog);
@@ -764,6 +805,7 @@ export async function handlePublicCatalog(request: Request, path: string) {
   if (request.method.toUpperCase() !== "GET" || !path.startsWith("marketplace/")) return null;
   try {
     if (path === "marketplace/home") return json(await marketplaceHome());
+    if (path === "marketplace/onboarding-catalog") return json(await marketplaceOnboardingCatalog());
     if (path === "marketplace/services") return json(await marketplaceServices(new URL(request.url)));
     if (path === "marketplace/providers") return json(await marketplaceProviders());
     const serviceMatch = path.match(/^marketplace\/services\/([^/]+)$/);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 
 export type EmailChangeRequest = {
   id: string;
@@ -59,15 +59,18 @@ export function EmailChangeRequestsCard({
         setError(null);
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Unable to load email change requests";
-        if (/Cannot GET|Not Found|404/i.test(message)) {
+        // Older backends may not expose this route yet — treat as an empty queue.
+        if (err instanceof ApiError && err.status === 404) {
           setRequests([]);
-          setError(
-            "Email-change API is unreachable. Use the TIC backend on port 4011 (NEXT_PUBLIC_API_URL=http://localhost:4011/api/v1), then refresh.",
-          );
+          setError(null);
           return;
         }
-        setError(message);
+        if (err instanceof Error && /Cannot GET|Cannot POST/i.test(err.message)) {
+          setRequests([]);
+          setError(null);
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Unable to load email change requests");
       });
   }, [filter]);
 

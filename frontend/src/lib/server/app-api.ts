@@ -264,6 +264,240 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
   };
 }
 
+async function hasPlatformAccess(userId: string, userStatus: string) {
+  if (userStatus !== "ACTIVE") return false;
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("user_roles")
+    .select(
+      "role:roles(organization_type, is_active, permissions:role_permissions(can_view, functionality:functionalities(code)))",
+    )
+    .eq("user_id", userId);
+  if (error) throw new ApiError(error.message, 500);
+  return (data ?? []).some((entry) => {
+    const role = camelize<{
+      organizationType?: string | null;
+      isActive?: boolean;
+      permissions?: Array<{ canView?: boolean; functionality?: { code?: string } }>;
+    }>(entry.role);
+    if (!role?.isActive || role.organizationType) return false;
+    return (role.permissions ?? []).some(
+      (permission) => permission.canView && permission.functionality?.code === "organizations.platform_access",
+    );
+  });
+}
+
+async function requirePlatformAccess(appUser: JsonMap) {
+  const allowed = await hasPlatformAccess(String(appUser.id), String(appUser.status ?? ""));
+  if (!allowed) throw new ApiError("Forbidden", 403);
+}
+
+async function listAdminEmailChanges(status: string | null) {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("email_change_tokens")
+    .select(
+      "id, status, current_email, new_email, created_at, otp_verified_at, reviewed_at, review_note, user_id, reviewed_by_user_id",
+    )
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (status) {
+    query = query.eq("status", status);
+  } else {
+    query = query.in("status", ["PENDING_APPROVAL", "APPROVED", "REJECTED"]);
+  }
+  const { data, error } = await query;
+  if (error) throw new ApiError(error.message, 500);
+
+  const userIds = [
+    ...new Set(
+      (data ?? []).flatMap((row) => [String(row.user_id ?? ""), String(row.reviewed_by_user_id ?? "")].filter(Boolean)),
+    ),
+  ];
+  const usersById = new Map<string, JsonMap>();
+  if (userIds.length) {
+    const { data: users, error: usersError } = await admin
+      .from("users")
+      .select("id, email, first_name, last_name, status")
+      .in("id", userIds);
+    if (usersError) throw new ApiError(usersError.message, 500);
+    for (const user of users ?? []) {
+      usersById.set(String(user.id), camelize(user));
+    }
+  }
+
+  return {
+    requests: (data ?? []).map((row) => {
+      const mapped = camelize<JsonMap>(row);
+      return {
+        id: mapped.id,
+        status: mapped.status,
+        currentEmail: mapped.currentEmail,
+        newEmail: mapped.newEmail,
+        createdAt: mapped.createdAt,
+        otpVerifiedAt: mapped.otpVerifiedAt,
+        reviewedAt: mapped.reviewedAt,
+        reviewNote: mapped.reviewNote,
+        user: usersById.get(String(row.user_id)) ?? null,
+        reviewedBy: row.reviewed_by_user_id ? usersById.get(String(row.reviewed_by_user_id)) ?? null : null,
+      };
+    }),
+  };
+}
+
+async function listAdminProviders(verificationStatus: string | null) {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("provider_profiles")
+    .select(
+      "id, organization_id, provider_types, headline, description, public_profile, verification_status, verified_at, created_at, organization:organizations(id, display_name, legal_name, status, description), services:provider_services(service:services(id, name, slug))",
+    )
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (verificationStatus) query = query.eq("verification_status", verificationStatus);
+  const { data, error } = await query;
+  if (error) throw new ApiError(error.message, 500);
+  const { count } = await admin
+    .from("provider_profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("verification_status", "PENDING");
+  return {
+    pendingCount: count ?? 0,
+    providers: camelize<JsonMap[]>(data ?? []).map((row) => {
+      const organization = (row.organization ?? {}) as JsonMap;
+      const services = Array.isArray(row.services)
+        ? row.services.flatMap((link) => {
+            const service = (link as JsonMap).service as JsonMap | null;
+            if (!service?.id) return [];
+            return [{ id: service.id, name: service.name, slug: service.slug }];
+          })
+        : [];
+      return {
+        id: row.id,
+        organizationId: row.organizationId,
+        organizationName: organization.displayName,
+        legalName: organization.legalName,
+        organizationStatus: organization.status,
+        organizationDescription: organization.description ?? null,
+        providerTypes: row.providerTypes ?? [],
+        headline: row.headline,
+        description: row.description,
+        publicProfile: row.publicProfile,
+        verificationStatus: row.verificationStatus,
+        verifiedAt: row.verifiedAt,
+        serviceCount: services.length,
+        services,
+        createdAt: row.createdAt,
+      };
+    }),
+  };
+}
+
+async function handleAdminApi(request: Request, path: string, method: string, appUser: JsonMap) {
+  if (path === "admin/email-changes" && method === "GET") {
+    await requirePlatformAccess(appUser);
+    const status = new URL(request.url).searchParams.get("status");
+    return json(await listAdminEmailChanges(status));
+  }
+
+  const emailAction = path.match(/^admin\/email-changes\/([^/]+)\/(approve|reject)$/);
+  if (emailAction && method === "POST") {
+    await requirePlatformAccess(appUser);
+    const [, id, action] = emailAction;
+    const admin = getSupabaseAdmin();
+    const { data: row, error } = await admin
+      .from("email_change_tokens")
+      .select("id, status, user_id, current_email, new_email")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw new ApiError(error.message, 500);
+    if (!row) throw new ApiError("Email change request not found", 404);
+    if (row.status !== "PENDING_APPROVAL") {
+      throw new ApiError("Only pending approval requests can be reviewed", 400);
+    }
+    if (action === "approve") {
+      const { data: taken } = await admin.from("users").select("id").eq("email", row.new_email).maybeSingle();
+      if (taken && taken.id !== row.user_id) {
+        throw new ApiError("An account with this email already exists", 400);
+      }
+      const { error: userError } = await admin
+        .from("users")
+        .update(touched({ email: row.new_email, email_verified_at: new Date().toISOString() }))
+        .eq("id", row.user_id);
+      if (userError) throw new ApiError(userError.message, 400);
+      const { error: tokenError } = await admin
+        .from("email_change_tokens")
+        .update(
+          touched({
+            status: "APPROVED",
+            reviewed_by_user_id: appUser.id,
+            reviewed_at: new Date().toISOString(),
+          }),
+        )
+        .eq("id", id);
+      if (tokenError) throw new ApiError(tokenError.message, 400);
+      return json({ id, status: "APPROVED" });
+    }
+    const body = await readJson(request);
+    const { error: rejectError } = await admin
+      .from("email_change_tokens")
+      .update(
+        touched({
+          status: "REJECTED",
+          reviewed_by_user_id: appUser.id,
+          reviewed_at: new Date().toISOString(),
+          review_note: String(body.note ?? "").trim() || null,
+        }),
+      )
+      .eq("id", id);
+    if (rejectError) throw new ApiError(rejectError.message, 400);
+    return json({ id, status: "REJECTED" });
+  }
+
+  if (path === "admin/providers" && method === "GET") {
+    await requirePlatformAccess(appUser);
+    const verificationStatus = new URL(request.url).searchParams.get("verificationStatus");
+    return json(await listAdminProviders(verificationStatus));
+  }
+
+  const providerAction = path.match(/^admin\/providers\/([^/]+)\/(verify|reject)$/);
+  if (providerAction && method === "POST") {
+    await requirePlatformAccess(appUser);
+    const [, id, action] = providerAction;
+    const admin = getSupabaseAdmin();
+    const { data: profile, error } = await admin.from("provider_profiles").select("id, verification_status").eq("id", id).maybeSingle();
+    if (error) throw new ApiError(error.message, 500);
+    if (!profile) throw new ApiError("Provider profile not found", 404);
+    if (action === "verify") {
+      if (profile.verification_status === "VERIFIED") throw new ApiError("This provider is already verified", 400);
+      const { data, error: updateError } = await admin
+        .from("provider_profiles")
+        .update(
+          touched({
+            verification_status: "VERIFIED",
+            verified_at: new Date().toISOString(),
+            public_profile: true,
+          }),
+        )
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (updateError) throw new ApiError(updateError.message, 400);
+      return json(camelize(data));
+    }
+    const { data, error: updateError } = await admin
+      .from("provider_profiles")
+      .update(touched({ verification_status: "REJECTED", verified_at: null }))
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (updateError) throw new ApiError(updateError.message, 400);
+    return json(camelize(data));
+  }
+
+  return null;
+}
+
 async function acceptTerms(authUser: { id: string; email?: string }) {
   const admin = getSupabaseAdmin();
   const appUser = await resolveAppUser(authUser);
@@ -426,6 +660,9 @@ export async function handleAppApi(request: Request, path: string) {
       status: String(appUser.status ?? ""),
     });
     if (privateCatalog) return privateCatalog;
+
+    const adminResponse = await handleAdminApi(request, path, method, appUser);
+    if (adminResponse) return adminResponse;
 
     if (method === "GET" && path === "rbac/modules") {
       return json(await listModules());

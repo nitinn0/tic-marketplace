@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Loader2, ShieldAlert, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 
 type AdminProvider = {
@@ -46,16 +46,19 @@ export function ProviderVerificationCard({
         setError(null);
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Unable to load pending providers";
-        if (/Cannot GET|Not Found|404/i.test(message)) {
+        if (err instanceof ApiError && err.status === 404) {
           setProviders([]);
           setPendingCount(0);
-          setError(
-            "Provider verification API is unreachable. Use the TIC backend on port 4011 (NEXT_PUBLIC_API_URL=http://localhost:4011/api/v1), then refresh.",
-          );
+          setError(null);
           return;
         }
-        setError(message);
+        if (err instanceof Error && /Cannot GET|Cannot POST/i.test(err.message)) {
+          setProviders([]);
+          setPendingCount(0);
+          setError(null);
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Unable to load pending providers");
       });
   }, []);
 

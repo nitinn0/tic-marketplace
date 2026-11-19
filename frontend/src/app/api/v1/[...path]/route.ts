@@ -4,8 +4,15 @@ import { proxyToNest } from "@/lib/server/nest-proxy";
 async function handle(request: Request, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   const joined = path.join("/");
+  const method = request.method.toUpperCase();
 
-  // Prefer the Nest API for authenticated platform routes; fall back to the Next handlers.
+  // Public marketplace reads (including onboarding-catalog) use the Supabase-backed
+  // handlers first so Join works even when Nest is down or on the wrong port.
+  if (method === "GET" && joined.startsWith("marketplace/")) {
+    const local = await handleAppApi(request, joined);
+    if (local.status !== 404) return local;
+  }
+
   try {
     const proxied = await proxyToNest(request, joined);
     if (proxied.status !== 404) return proxied;

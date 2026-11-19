@@ -26,8 +26,28 @@ export const providersService = {
     api.patch<ProviderProfile>("/provider/profile", input, scoped(organizationId)),
   catalog: (organizationId: string) => api.get<ProviderCatalog>("/provider/catalog", scoped(organizationId)),
   /** Public active category/service tree for join onboarding (no org header). */
-  onboardingCatalog: () =>
-    api.get<Pick<ProviderCatalog, "categories" | "services">>("/marketplace/onboarding-catalog"),
+  onboardingCatalog: async () => {
+    try {
+      return await api.get<Pick<ProviderCatalog, "categories" | "services">>("/marketplace/onboarding-catalog");
+    } catch (primaryError) {
+      const fallbacks = [
+        "/api/v1/marketplace/onboarding-catalog",
+        "http://127.0.0.1:4011/api/v1/marketplace/onboarding-catalog",
+        "http://localhost:4011/api/v1/marketplace/onboarding-catalog",
+      ];
+      for (const url of fallbacks) {
+        try {
+          const response = await fetch(url, { headers: { Accept: "application/json" } });
+          if (!response.ok) continue;
+          const data = (await response.json()) as Pick<ProviderCatalog, "categories" | "services">;
+          if (data.categories?.length) return data;
+        } catch {
+          // try next fallback
+        }
+      }
+      throw primaryError;
+    }
+  },
 
   publishService: (
     organizationId: string,

@@ -120,7 +120,9 @@ export function ServiceCascadePicker({
   }, [catalog, selectedServiceIds]);
 
   const roots = useMemo(() => {
-    const rows = (catalog?.categories ?? []).filter((category) => category.depth === 0);
+    const rows = (catalog?.categories ?? []).filter(
+      (category) => category.depth === 0 || category.parentId == null,
+    );
     const preferred = ROOT_SLUGS.map((slug) => rows.find((row) => row.slug === slug)).filter(Boolean) as CatalogCategory[];
     return preferred.length ? preferred : rows;
   }, [catalog]);
@@ -128,7 +130,12 @@ export function ServiceCascadePicker({
   const subcategories = useMemo(() => {
     if (!catalog || rootIds.length === 0) return [] as CatalogCategory[];
     const rootSet = new Set(rootIds);
-    return catalog.categories.filter((category) => category.depth === 1 && category.parentId && rootSet.has(category.parentId));
+    return catalog.categories.filter(
+      (category) =>
+        category.parentId &&
+        rootSet.has(category.parentId) &&
+        (category.depth === 1 || category.depth == null || category.depth > 0),
+    );
   }, [catalog, rootIds]);
 
   const services = useMemo(() => {

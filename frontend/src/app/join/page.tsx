@@ -135,41 +135,45 @@ export default function JoinPage() {
     if (kind !== "organisation") return;
     let cancelled = false;
 
+    async function fetchCatalog(url: string) {
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error(`Catalogue request failed (${response.status})`);
+      return (await response.json()) as Pick<ProviderCatalog, "categories" | "services">;
+    }
+
     async function loadCatalog() {
-      try {
-        const data = await providersService.onboardingCatalog();
-        if (cancelled) return;
-        if (!data.categories?.length) {
-          setCatalog(data);
-          setCatalogError("Service catalogue is empty. Seed categories in the backend, then refresh.");
-          return;
-        }
-        setCatalog(data);
-        setCatalogError(null);
-      } catch (primaryError) {
-        // Nest may be down locally — try the Next.js same-origin marketplace proxy.
+      const sources: Array<() => Promise<Pick<ProviderCatalog, "categories" | "services">>> = [
+        () => providersService.onboardingCatalog(),
+        () => fetchCatalog("/api/v1/marketplace/onboarding-catalog"),
+        () => fetchCatalog("http://127.0.0.1:4011/api/v1/marketplace/onboarding-catalog"),
+        () => fetchCatalog("http://localhost:4011/api/v1/marketplace/onboarding-catalog"),
+      ];
+
+      let lastError: unknown = null;
+      for (const source of sources) {
         try {
-          const response = await fetch("/api/v1/marketplace/onboarding-catalog");
-          if (!response.ok) throw primaryError;
-          const data = (await response.json()) as Pick<ProviderCatalog, "categories" | "services">;
+          const data = await source();
           if (cancelled) return;
-          if (!data.categories?.length) {
-            setCatalog(data);
-            setCatalogError("Service catalogue is empty. Seed categories in the backend, then refresh.");
-            return;
+          const roots = (data.categories ?? []).filter((category) => category.depth === 0 || category.parentId == null);
+          if (!data.categories?.length || roots.length === 0) {
+            lastError = new Error("Service catalogue returned no categories");
+            continue;
           }
           setCatalog(data);
           setCatalogError(null);
-        } catch {
-          if (!cancelled) {
-            setCatalog(null);
-            setCatalogError(
-              primaryError instanceof Error
-                ? primaryError.message
-                : "Unable to load service catalogue. Start the API (port 4011) and refresh.",
-            );
-          }
+          return;
+        } catch (error) {
+          lastError = error;
         }
+      }
+
+      if (!cancelled) {
+        setCatalog(null);
+        setCatalogError(
+          lastError instanceof Error
+            ? lastError.message
+            : "Unable to load service catalogue. Start the API on port 4011 and refresh.",
+        );
       }
     }
 
@@ -474,15 +478,20 @@ export default function JoinPage() {
               <p className="text-xs text-slate-500">
                 Select one or more of the four categories, then subcategories, then services. Add a new service if needed.
               </p>
+              {catalogError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">{catalogError}</div>
+              ) : null}
+              {!catalog && !catalogError ? (
+                <p className="text-sm text-slate-500">Loading service catalogue…</p>
+              ) : null}
               <ServiceCascadePicker
                 catalog={catalog}
                 selectedServiceIds={selectedServiceIds}
                 onSelectedServiceIdsChange={setSelectedServiceIds}
                 customServices={customServices}
                 onCustomServicesChange={setCustomServices}
-                disabled={loading}
+                disabled={loading || !catalog}
               />
-              {catalogError ? <p className="text-sm text-red-700">{catalogError}</p> : null}
             </div>
           ) : (
             <div>

@@ -59,7 +59,15 @@ export function EmailChangeRequestsCard({
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Unable to load email change requests");
+        const message = err instanceof Error ? err.message : "Unable to load email change requests";
+        if (/Cannot GET|Not Found|404/i.test(message)) {
+          setRequests([]);
+          setError(
+            "Email-change API is unreachable. Use the TIC backend on port 4011 (NEXT_PUBLIC_API_URL=http://localhost:4011/api/v1), then refresh.",
+          );
+          return;
+        }
+        setError(message);
       });
   }, [filter]);
 

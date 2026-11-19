@@ -8,6 +8,7 @@ import { ArrowRight, ClipboardList, LogOut, MapPin, ShieldCheck, Tags } from "lu
 import { Container } from "@/components/common/container";
 import { Badge } from "@/components/ui/badge";
 import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
+import { ProviderVerificationCard } from "@/features/admin/components/provider-verification-card";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
 import { hasPermission, ORGANIZATION_FUNCTIONALITIES } from "@/features/organizations/utils/permissions";
 import { ProviderBasicForm } from "@/features/providers/components/provider-basic-form";
@@ -213,7 +214,24 @@ export default function ProviderDashboardPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {canReviewEmailChanges ? <EmailChangeRequestsCard /> : null}
+            {canReviewEmailChanges ? (
+              <>
+                <ProviderVerificationCard />
+                <EmailChangeRequestsCard />
+              </>
+            ) : null}
+            {profile && profile.verificationStatus !== "VERIFIED" ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p className="font-semibold">
+                  {profile.verificationStatus === "REJECTED" ? "Verification rejected" : "Verification pending"}
+                </p>
+                <p className="mt-1 text-amber-900/80">
+                  {profile.verificationStatus === "REJECTED"
+                    ? "Update your profile and services, then wait for a super admin to review again. Buyers cannot see your company or services until you are verified."
+                    : "Your company and services stay hidden from buyers until a super admin completes verification."}
+                </p>
+              </div>
+            ) : null}
             <div className="flex gap-1 overflow-x-auto border-b border-[#EADFCF] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {tabs.map((tab) => {
                 const active = panel === tab.id;

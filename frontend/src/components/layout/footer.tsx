@@ -141,7 +141,10 @@ export function Footer() {
           <p>
             &copy; {year} {appName}. All rights reserved.
           </p>
-          <p>Testing · Inspection · Certification · ESG</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Testing · Inspection · Certification · ESG</span>
+            <FooterLink href={routes.terms}>Terms & Conditions</FooterLink>
+          </p>
         </div>
       </div>
     </footer>

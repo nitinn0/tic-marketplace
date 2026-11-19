@@ -27,6 +27,7 @@ import {
   containsCompanyClassification,
 } from "@/features/providers/utils/company-classification";
 import { providerTypesFromSelection } from "@/features/providers/utils/provider-types-from-catalog";
+import { destinationWithTerms } from "@/features/auth/utils/terms-gate";
 import { ApiError, api, setActiveOrganizationId, usesSupabaseAuth } from "@/lib/api";
 import { clearSession, getStoredSession, saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
@@ -43,6 +44,7 @@ type RegisterResponse = {
     firstName: string;
     lastName: string;
     status: string;
+    termsAcceptedAt?: string | null;
   };
 };
 
@@ -287,7 +289,7 @@ export default function JoinPage() {
       })),
     });
 
-    router.push(routes.providerProfile);
+    router.push(await destinationWithTerms(routes.providerProfile));
     router.refresh();
   }
 
@@ -319,7 +321,7 @@ export default function JoinPage() {
       availabilityStatus: "AVAILABLE",
     });
 
-    router.push(routes.professionalProfile);
+    router.push(await destinationWithTerms(routes.professionalProfile));
     router.refresh();
   }
 

@@ -53,6 +53,8 @@ export class ProviderProfilesService {
             description: optionalText(dto.description) ?? null,
             yearsInBusiness: dto.yearsInBusiness ?? null,
             publicProfile: dto.publicProfile ?? false,
+            verificationStatus: 'PENDING',
+            verifiedAt: null,
           },
         });
         await this.audit.log(

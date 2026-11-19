@@ -89,6 +89,13 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('terms/accept')
+  @HttpCode(HttpStatus.OK)
+  async acceptTerms(@Req() req: Request) {
+    return this.authService.acceptTerms(req.user as { sub: string });
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@Req() req: Request) {
     return this.authService.getCurrentUser(req.user as { sub: string });

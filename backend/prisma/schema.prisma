@@ -31,6 +31,8 @@ model User {
   status          UserStatus @default(ACTIVE)
   emailVerifiedAt DateTime?  @map("email_verified_at")
   phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  /// Set when the user accepts Terms & Conditions; null means they still need to accept once.
+  termsAcceptedAt DateTime?  @map("terms_accepted_at")
   lastLoginAt     DateTime?  @map("last_login_at")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")

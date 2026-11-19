@@ -13,6 +13,7 @@ import {
   PasswordStrengthMeter,
 } from "@/features/auth/components/auth-field";
 import { AuthShell } from "@/features/auth/components/auth-shell";
+import { withTermsGate } from "@/features/auth/utils/terms-gate";
 import { api } from "@/lib/api";
 import { saveSession } from "@/lib/auth";
 import { routes } from "@/lib/constants";
@@ -27,6 +28,7 @@ type RegisterResponse = {
     firstName: string;
     lastName: string;
     status: string;
+    termsAcceptedAt?: string | null;
   };
 };
 
@@ -54,7 +56,7 @@ export default function RegisterPage() {
         password,
       });
       saveSession(result);
-      router.push(routes.dashboard);
+      router.push(withTermsGate(routes.dashboard, result.user));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create the account.");
@@ -145,6 +147,14 @@ export default function RegisterPage() {
               {error}
             </div>
           ) : null}
+
+          <p className="text-xs leading-relaxed text-slate-500">
+            By creating an account you will be asked to accept our{" "}
+            <Link href={routes.terms} className="font-semibold text-sky-700 hover:text-sky-800">
+              Terms & Conditions
+            </Link>{" "}
+            once before continuing.
+          </p>
 
           <Button type="submit" className="mt-1 h-11 w-full text-sm font-semibold" disabled={loading || !canSubmit}>
             {loading ? (

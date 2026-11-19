@@ -4,6 +4,7 @@ export type SessionUser = {
   firstName: string;
   lastName: string;
   status: string;
+  termsAcceptedAt?: string | null;
 };
 
 export type SessionPayload = {

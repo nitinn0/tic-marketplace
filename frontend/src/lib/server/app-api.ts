@@ -238,6 +238,7 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
     lastName: string;
     phone: string | null;
     status: string;
+    termsAcceptedAt?: string | null;
   }>(appUser);
 
   const globalRoles = roles.map((role) => ({
@@ -254,11 +255,45 @@ async function getCurrentProfile(authUser: { id: string; email?: string }) {
       lastName: user.lastName,
       phone: user.phone,
       status: user.status,
+      termsAcceptedAt: user.termsAcceptedAt ?? null,
     },
     globalRoles,
     roles: globalRoles,
     permissions,
     ...(await getMeOrganizations(user.id)),
+  };
+}
+
+async function acceptTerms(authUser: { id: string; email?: string }) {
+  const admin = getSupabaseAdmin();
+  const appUser = await resolveAppUser(authUser);
+  const existing = camelize<{ id: string; termsAcceptedAt?: string | null }>(appUser);
+  const acceptedAt = existing.termsAcceptedAt ?? new Date().toISOString();
+  if (!existing.termsAcceptedAt) {
+    const { error } = await admin
+      .from("users")
+      .update({ terms_accepted_at: acceptedAt, updated_at: new Date().toISOString() })
+      .eq("id", appUser.id);
+    if (error) throw new ApiError(error.message, 400);
+  }
+  const refreshed = await resolveAppUser(authUser);
+  const user = camelize<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+    termsAcceptedAt?: string | null;
+  }>(refreshed);
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      status: user.status,
+      termsAcceptedAt: user.termsAcceptedAt ?? acceptedAt,
+    },
   };
 }
 
@@ -374,6 +409,10 @@ export async function handleAppApi(request: Request, path: string) {
 
     if (method === "GET" && path === "auth/me") {
       return json(await getCurrentProfile(authUser));
+    }
+
+    if (method === "POST" && path === "auth/terms/accept") {
+      return json(await acceptTerms(authUser));
     }
 
     const appUser = await resolveAppUser(authUser);

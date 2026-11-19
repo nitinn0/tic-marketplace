@@ -52,8 +52,10 @@ export function getApiBaseUrl() {
     return configuredApiUrl;
   }
 
+  // Remote previews cannot call the developer's localhost Nest directly. Use the
+  // same-origin Next `/api/v1` proxy, which forwards to Nest on the server.
   if (isBrowserOnRemoteHost()) {
-    return "";
+    return "/api/v1";
   }
 
   return configuredApiUrl || "http://localhost:4011/api/v1";
@@ -61,7 +63,9 @@ export function getApiBaseUrl() {
 
 /** True only when the client is deliberately pointed at a same-origin path API (legacy). */
 export function usesSupabaseAuth() {
-  return getApiBaseUrl().startsWith("/");
+  // Use the configured value, not the remote-preview proxy fallback — `/api/v1` proxy still talks to Nest.
+  const configured = resolvedConfiguredApiUrl();
+  return configured.startsWith("/");
 }
 
 export function isRemoteApiConfigured() {

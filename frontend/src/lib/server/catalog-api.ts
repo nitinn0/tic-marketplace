@@ -253,6 +253,7 @@ async function loadCatalog() {
       const locationLinks = Array.isArray(row.locations) ? row.locations : [];
       const publicProfile =
         Boolean(row.public_profile) &&
+        row.verification_status === "VERIFIED" &&
         organization?.status === "ACTIVE" &&
         organization?.organization_type === "PROVIDER";
       return {
@@ -397,7 +398,7 @@ async function marketplaceOnboardingCatalog() {
 
 async function marketplaceHome() {
   const catalog = await loadCatalog();
-  const services = activeServices(catalog);
+  const services = activeServices(catalog).filter((service) => providerCountFor(service.id, catalog.providers) > 0);
   const roots = (catalog.index.childrenOf.get(null) ?? []).filter((category) => category.active);
   const popularOrder = new Map(POPULAR_SLUGS.map((slug, position) => [slug, position]));
   const popular = [...services]
@@ -431,7 +432,7 @@ async function marketplaceHome() {
 
 async function marketplaceServices(url: URL) {
   const catalog = await loadCatalog();
-  const services = activeServices(catalog);
+  const services = activeServices(catalog).filter((service) => providerCountFor(service.id, catalog.providers) > 0);
   const categorySlug = url.searchParams.get("category");
   const category = categorySlug
     ? [...catalog.index.byId.values()].find((row) => row.slug === categorySlug && effectivelyActive(catalog.index, row.id))
@@ -462,8 +463,8 @@ async function marketplaceServices(url: URL) {
 async function marketplaceService(slug: string) {
   const catalog = await loadCatalog();
   const service = activeServices(catalog).find((row) => row.slug === slug);
-  if (!service) throw new CatalogError("Service not found", 404);
-  const offering = catalog.providers.filter((provider) => provider.services.some((row) => row.id === service.id));
+  const offering = catalog.providers.filter((provider) => provider.services.some((row) => row.id === service?.id));
+  if (!service || offering.length === 0) throw new CatalogError("Service not found", 404);
   return {
     ...serviceCard(service, catalog.index, offering.length, postedByFor(service.id, offering)),
     description: service.description,

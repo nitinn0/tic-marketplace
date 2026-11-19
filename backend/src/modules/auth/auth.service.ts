@@ -34,6 +34,7 @@ type PublicUser = {
   phone: string | null;
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
+  termsAcceptedAt: Date | null;
   lastLoginAt: Date | null;
 };
 
@@ -391,6 +392,23 @@ export class AuthService {
     return { message: 'Password updated. Sign in with your new password.' };
   }
 
+  /** Records Terms & Conditions acceptance once; subsequent calls are no-ops. */
+  async acceptTerms(requestUser: { sub: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: requestUser.sub } });
+    if (!user) throw new UnauthorizedException('User not found');
+    if (user.status !== 'ACTIVE') throw new ForbiddenException('User account is not active');
+
+    const updated =
+      user.termsAcceptedAt != null
+        ? user
+        : await this.prisma.user.update({
+            where: { id: user.id },
+            data: { termsAcceptedAt: new Date() },
+          });
+
+    return { user: this.publicUser(updated) };
+  }
+
   async getCurrentUser(requestUser: { sub: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: requestUser.sub },
@@ -537,6 +555,7 @@ export class AuthService {
     phone: string | null;
     emailVerifiedAt: Date | null;
     phoneVerifiedAt: Date | null;
+    termsAcceptedAt: Date | null;
     lastLoginAt: Date | null;
   }): PublicUser {
     return {
@@ -548,6 +567,7 @@ export class AuthService {
       phone: user.phone,
       emailVerifiedAt: user.emailVerifiedAt,
       phoneVerifiedAt: user.phoneVerifiedAt,
+      termsAcceptedAt: user.termsAcceptedAt,
       lastLoginAt: user.lastLoginAt,
     };
   }

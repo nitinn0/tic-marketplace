@@ -37,6 +37,7 @@ export const routes = {
   message: (id: string) => `/messages/${id}`,
   join: "/join",
   howItWorks: "/how-it-works",
+  terms: "/terms",
 } as const;
 
 export type UserRole = "buyer" | "provider" | "admin";

@@ -77,12 +77,13 @@ export class MarketplaceCatalogService {
     ]);
     const index = buildTreeIndex(categories);
     const roots = (index.childrenOf.get(null) ?? []).filter((category) => category.active);
+    const listedServices = services.filter((service) => service.providers.length > 0);
 
     return {
       counts: {
-        verifiedProviders: providers.filter((provider) => provider.verificationStatus === 'VERIFIED').length,
+        verifiedProviders: providers.length,
         providers: providers.length,
-        services: services.length,
+        services: listedServices.length,
       },
       categories: roots.map((root) => ({
         id: root.slug,
@@ -90,9 +91,9 @@ export class MarketplaceCatalogService {
         name: root.name,
         categoryType: root.categoryType,
         tagline: root.description || CATEGORY_TAGLINE[root.slug] || '',
-        serviceCount: services.filter((service) => this.rootId(index, service.categoryId) === root.id).length,
+        serviceCount: listedServices.filter((service) => this.rootId(index, service.categoryId) === root.id).length,
       })),
-      popular: this.popular(services),
+      popular: this.popular(listedServices),
       providers: providers.slice(0, 6).map((provider) => this.toProviderCard(provider)),
       industries: industries.map((industry) => industry.name),
     };
@@ -116,6 +117,7 @@ export class MarketplaceCatalogService {
       .split(/[^a-z0-9]+/)
       .filter((word) => word.length > 0);
     const filtered = services.filter((service) => {
+      if (service.providers.length === 0) return false;
       if (allowed && !allowed.has(service.categoryId)) return false;
       if (keywords.length === 0) return true;
       const path = ancestorsOf(index, service.categoryId).map((node) => node.name).join(' ');
@@ -136,7 +138,7 @@ export class MarketplaceCatalogService {
     ]);
     const index = buildTreeIndex(categories);
     const service = services.find((row) => row.slug === slug);
-    if (!service || !isEffectivelyActive(index, service.categoryId)) {
+    if (!service || !isEffectivelyActive(index, service.categoryId) || service.providers.length === 0) {
       throw new NotFoundException('Service not found');
     }
     const offering = providers.filter((provider) => provider.services.some((row) => row.service.id === service.id));

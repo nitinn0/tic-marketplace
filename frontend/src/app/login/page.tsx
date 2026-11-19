@@ -7,6 +7,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 
 import { AuthField, AuthInput, AuthPasswordInput } from "@/features/auth/components/auth-field";
 import { AuthShell } from "@/features/auth/components/auth-shell";
+import { destinationWithTerms, withTermsGate } from "@/features/auth/utils/terms-gate";
 import { organizationsService } from "@/features/organizations/services/organizations.service";
 import { api, usesSupabaseAuth } from "@/lib/api";
 import { homeForMemberships, requestedNext } from "@/lib/home-route";
@@ -24,6 +25,7 @@ type LoginResponse = {
     firstName: string;
     lastName: string;
     status: string;
+    termsAcceptedAt?: string | null;
   };
 };
 
@@ -72,7 +74,7 @@ export default function LoginPage() {
             status: "ACTIVE",
           }),
         );
-        router.push(await destinationAfterLogin());
+        router.push(await destinationWithTerms(await destinationAfterLogin()));
         router.refresh();
         return;
       }
@@ -81,7 +83,7 @@ export default function LoginPage() {
       window.localStorage.setItem("tic_access_token", result.accessToken);
       window.localStorage.setItem("tic_refresh_token", result.refreshToken);
       window.localStorage.setItem("tic_user", JSON.stringify(result.user));
-      router.push(await destinationAfterLogin());
+      router.push(withTermsGate(await destinationAfterLogin(), result.user));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");

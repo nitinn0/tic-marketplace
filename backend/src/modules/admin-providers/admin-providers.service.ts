@@ -20,24 +20,38 @@ export class AdminProvidersService {
         : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        organization: { select: { id: true, displayName: true, legalName: true, status: true } },
+        organization: { select: { id: true, displayName: true, legalName: true, status: true, description: true } },
+        services: {
+          include: { service: { select: { id: true, name: true, slug: true } } },
+          orderBy: { createdAt: 'asc' },
+          take: 40,
+        },
         _count: { select: { services: true } },
       },
       take: 200,
     });
+    const pendingCount = await this.prisma.providerProfile.count({ where: { verificationStatus: 'PENDING' } });
     return {
+      pendingCount,
       providers: rows.map((row) => ({
         id: row.id,
         organizationId: row.organizationId,
         organizationName: row.organization.displayName,
         legalName: row.organization.legalName,
         organizationStatus: row.organization.status,
+        organizationDescription: row.organization.description,
         providerTypes: row.providerTypes,
         headline: row.headline,
+        description: row.description,
         publicProfile: row.publicProfile,
         verificationStatus: row.verificationStatus,
         verifiedAt: row.verifiedAt,
         serviceCount: row._count.services,
+        services: row.services.map((link) => ({
+          id: link.service.id,
+          name: link.service.name,
+          slug: link.service.slug,
+        })),
         createdAt: row.createdAt,
       })),
     };
@@ -55,7 +69,7 @@ export class AdminProvidersService {
 
     const updated = await this.prisma.providerProfile.update({
       where: { id: providerId },
-      data: { verificationStatus: 'VERIFIED', verifiedAt: new Date() },
+      data: { verificationStatus: 'VERIFIED', verifiedAt: new Date(), publicProfile: true },
     });
     await this.audit.log({
       action: AUDIT_ACTIONS.providerVerified,

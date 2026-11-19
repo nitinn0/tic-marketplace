@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { HighlightCarousel, type CarouselSlide } from "@/components/dashboard/highlight-carousel";
 import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
+import { ProviderVerificationCard } from "@/features/admin/components/provider-verification-card";
 import { clearSession, isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
@@ -159,7 +160,12 @@ export default function DashboardPage() {
         <div className="mt-8 space-y-8">
           <HighlightCarousel slides={slides} />
 
-          {canReviewEmailChanges ? <EmailChangeRequestsCard /> : null}
+          {canReviewEmailChanges ? (
+            <>
+              <ProviderVerificationCard />
+              <EmailChangeRequestsCard />
+            </>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {ACTIONS.map(({ href, title, body, icon: Icon }) => (

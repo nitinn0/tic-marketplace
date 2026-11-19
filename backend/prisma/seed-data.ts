@@ -181,7 +181,7 @@ export async function seedRbac(prisma: PrismaClient) {
     'Organization Members',
     'edit',
     1,
-    'View, invite, suspend and remove members.',
+    'View, invite and suspend members. Removal is reserved for platform super admins.',
   );
   const orgMemberRoles = await upsertFunctionality(
     organizationMembers.id,
@@ -230,7 +230,8 @@ export async function seedRbac(prisma: PrismaClient) {
 
   for (const role of [providerAdmin, buyerAdmin]) {
     await upsertRolePermission(role.id, orgProfile.id, adminLevel.id, { canView: true, canEdit: true, canCreate: false, canDelete: false, canConfigure: false });
-    await upsertRolePermission(role.id, orgMembers.id, adminLevel.id, { canView: true, canCreate: true, canEdit: true, canDelete: true, canConfigure: false });
+    // Member removal (kick) is reserved for SUPER_ADMIN via organizations.platform_access.
+    await upsertRolePermission(role.id, orgMembers.id, adminLevel.id, { canView: true, canCreate: true, canEdit: true, canDelete: false, canConfigure: false });
     await upsertRolePermission(role.id, orgMemberRoles.id, adminLevel.id, { canView: true, canCreate: true, canEdit: false, canDelete: true, canConfigure: false });
     await upsertRolePermission(role.id, orgOwnership.id, adminLevel.id, { canView: true, canEdit: true, canCreate: false, canDelete: false, canConfigure: false });
   }

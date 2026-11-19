@@ -21,7 +21,7 @@ const CATEGORY_CHIPS = [
   { slug: "testing", label: "Testing" },
   { slug: "inspection", label: "Inspection" },
   { slug: "certification", label: "Certification" },
-  { slug: "experts-consulting", label: "Consulting" },
+  { slug: "professional-services", label: "Consulting" },
 ];
 
 function chipHref(slug: string, q: string) {

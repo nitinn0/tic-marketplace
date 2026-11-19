@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -23,6 +24,8 @@ import {
   OnboardProfessionalDto,
   UpdateProfessionalProfileDto,
 } from './dto/professional-profile.dto.js';
+import { ChatService } from '../chat/chat.service.js';
+import { ListMessagesQueryDto, SendMessageDto } from '../chat/dto/chat.dto.js';
 import { ProfessionalProfilesService } from './services/professional-profiles.service.js';
 
 /**
@@ -31,7 +34,50 @@ import { ProfessionalProfilesService } from './services/professional-profiles.se
  */
 @Controller('professional')
 export class ProfessionalController {
-  constructor(private readonly profiles: ProfessionalProfilesService) {}
+  constructor(
+    private readonly profiles: ProfessionalProfilesService,
+    private readonly chat: ChatService,
+  ) {}
+
+  @Get('conversations')
+  @UseGuards(JwtAuthGuard)
+  listConversations(@CurrentUser() user: AuthenticatedUser) {
+    return this.chat.listForProfessional(user.sub);
+  }
+
+  @Get('conversations/:id')
+  @UseGuards(JwtAuthGuard)
+  getConversation(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.getForProfessional(user.sub, id);
+  }
+
+  @Get('conversations/:id/messages')
+  @UseGuards(JwtAuthGuard)
+  listMessages(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListMessagesQueryDto,
+  ) {
+    return this.chat.listMessagesForProfessional(user.sub, id, query);
+  }
+
+  @Post('conversations/:id/messages')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard)
+  sendMessage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.chat.sendForProfessional(user.sub, id, dto.body);
+  }
+
+  @Post('conversations/:id/read')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  markRead(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.markReadForProfessional(user.sub, id);
+  }
 
   @Post('onboard')
   @HttpCode(HttpStatus.CREATED)

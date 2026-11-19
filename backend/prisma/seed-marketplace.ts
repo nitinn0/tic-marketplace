@@ -2,109 +2,11 @@ import type { CoverageType, PrismaClient, ServiceCategoryType } from '@prisma/cl
 
 import { buildLocationKey } from '../src/modules/taxonomy/utils/location.util.js';
 import { assignGlobalRole, DEMO_ORGANIZATIONS, DEMO_USERS, upsertUser } from './seed-data.js';
-
-type CategorySeed = {
-  slug: string;
-  name: string;
-  description?: string;
-  children?: CategorySeed[];
-  services?: Array<{ slug: string; name: string; description?: string }>;
-};
-
-/** Intentionally small: the production taxonomy is curated through the admin UI. */
-const CATEGORY_TREE: Array<CategorySeed & { categoryType: ServiceCategoryType }> = [
-  {
-    slug: 'certification',
-    name: 'Certification',
-    categoryType: 'CERTIFICATION',
-    description: 'Third-party certification of management systems, products and people.',
-    children: [
-      {
-        slug: 'management-systems',
-        name: 'Management Systems',
-        children: [
-          {
-            slug: 'iso',
-            name: 'ISO',
-            services: [
-              { slug: 'iso-9001-certification', name: 'ISO 9001 Certification', description: 'Quality management system certification.' },
-              { slug: 'iso-14001-certification', name: 'ISO 14001 Certification', description: 'Environmental management system certification.' },
-              { slug: 'iso-45001-certification', name: 'ISO 45001 Certification', description: 'Occupational health and safety management system certification.' },
-              { slug: 'iso-27001-certification', name: 'ISO 27001 Certification', description: 'Information security management system certification.' },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    slug: 'testing',
-    name: 'Testing',
-    categoryType: 'TESTING',
-    description: 'Laboratory and field testing services.',
-    children: [
-      {
-        slug: 'environmental-testing',
-        name: 'Environmental',
-        children: [
-          {
-            slug: 'water-testing',
-            name: 'Water',
-            children: [
-              {
-                slug: 'water-chemical',
-                name: 'Chemical',
-                services: [{ slug: 'water-chemical-testing', name: 'Water Chemical Testing' }],
-              },
-              {
-                slug: 'water-microbiological',
-                name: 'Microbiological',
-                services: [{ slug: 'water-microbiological-testing', name: 'Water Microbiological Testing' }],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    slug: 'inspection',
-    name: 'Inspection',
-    categoryType: 'INSPECTION',
-    description: 'Inspection of facilities, equipment and products.',
-    children: [
-      {
-        slug: 'industrial-inspection',
-        name: 'Industrial',
-        services: [{ slug: 'factory-inspection', name: 'Factory Inspection' }],
-        children: [
-          {
-            slug: 'ndt',
-            name: 'NDT',
-            description: 'Non-destructive testing.',
-            services: [
-              { slug: 'ultrasonic-testing', name: 'Ultrasonic Testing' },
-              { slug: 'magnetic-particle-testing', name: 'Magnetic Particle Testing' },
-              { slug: 'dye-penetrant-testing', name: 'Dye Penetrant Testing' },
-              { slug: 'radiographic-testing', name: 'Radiographic Testing' },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    slug: 'experts-consulting',
-    name: 'Experts & Consulting',
-    categoryType: 'CONSULTING',
-    description: 'Independent experts, consultants, auditors and verifiers.',
-    children: [
-      { slug: 'consulting', name: 'Consulting', services: [{ slug: 'management-system-consulting', name: 'Management System Consulting' }] },
-      { slug: 'auditing', name: 'Auditing', services: [{ slug: 'supplier-audit', name: 'Supplier Audit' }] },
-      { slug: 'verification', name: 'Verification', services: [{ slug: 'ghg-verification', name: 'GHG Emissions Verification' }] },
-    ],
-  },
-];
+import {
+  MARKETPLACE_CATALOGUE,
+  uniqueServiceSlug,
+  type CatalogueCategory,
+} from './taxonomy-catalogue.js';
 
 const STANDARDS = [
   { code: 'ISO 9001', name: 'Quality management systems', version: '2015' },
@@ -146,23 +48,37 @@ const LOCATIONS: Array<{ countryCode: string; state?: string; city?: string; lat
 /** Idempotent: rows are matched by slug/code/location key and refreshed, never duplicated. */
 export async function seedTaxonomy(prisma: PrismaClient) {
   const seedCategory = async (
-    node: CategorySeed,
+    node: CatalogueCategory,
     categoryType: ServiceCategoryType,
     parentId: string | null,
     sortOrder: number,
   ) => {
-    const data = { name: node.name, description: node.description ?? null, categoryType, parentId, sortOrder, active: true };
+    const data = {
+      name: node.name,
+      description: node.description ?? null,
+      categoryType,
+      parentId,
+      sortOrder,
+      active: true,
+    };
     const category = await prisma.serviceCategory.upsert({
       where: { slug: node.slug },
       update: data,
       create: { slug: node.slug, ...data },
     });
     for (const [index, service] of (node.services ?? []).entries()) {
-      const serviceData = { name: service.name, description: service.description ?? null, categoryId: category.id, sortOrder: index + 1, active: true };
+      const slug = uniqueServiceSlug(node.slug, service.slug);
+      const serviceData = {
+        name: service.name,
+        description: null,
+        categoryId: category.id,
+        sortOrder: index + 1,
+        active: true,
+      };
       await prisma.service.upsert({
-        where: { slug: service.slug },
+        where: { slug },
         update: serviceData,
-        create: { slug: service.slug, ...serviceData },
+        create: { slug, ...serviceData },
       });
     }
     for (const [index, child] of (node.children ?? []).entries()) {
@@ -170,7 +86,7 @@ export async function seedTaxonomy(prisma: PrismaClient) {
     }
   };
 
-  for (const [index, root] of CATEGORY_TREE.entries()) {
+  for (const [index, root] of MARKETPLACE_CATALOGUE.entries()) {
     await seedCategory(root, root.categoryType, null, index + 1);
   }
 
@@ -236,7 +152,15 @@ export async function seedDemoMarketplaceProfiles(prisma: PrismaClient) {
     });
 
     const services = await prisma.service.findMany({
-      where: { slug: { in: ['water-chemical-testing', 'water-microbiological-testing'] } },
+      where: {
+        slug: {
+          in: [
+            'environmental-testing-water-quality-testing',
+            'microbiological-testing-bacterial-testing',
+            'chemical-testing-chemical-composition-analysis',
+          ],
+        },
+      },
     });
     const standards = await prisma.standard.findMany({ where: { code: { in: ['ISO 14001'] } } });
     const industries = await prisma.industry.findMany({ where: { slug: { in: ['chemicals', 'pharmaceuticals', 'food-and-beverage'] } } });

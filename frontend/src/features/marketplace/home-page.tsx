@@ -42,6 +42,7 @@ const CAT_ICON: Record<string, LucideIcon> = {
   inspection: ScanSearch,
   certification: ShieldCheck,
   esg: Leaf,
+  "professional-services": Users,
   "experts-consulting": Users,
   consulting: Users,
   professional: Users,
@@ -66,14 +67,15 @@ const CATEGORY_LOOK: Record<string, { surface: string; icon: string; glow: strin
     glow: "bg-[#F2A98B]/40",
     bar: "bg-[#E36F47]",
   },
-  "experts-consulting": {
+  "professional-services": {
     surface: "from-[#FBF3E0] via-white to-white",
     icon: "bg-gradient-to-br from-[#C9922B] to-[#8F6414] text-white",
     glow: "bg-[#E5C376]/30",
     bar: "bg-[#C9922B]",
   },
 };
-CATEGORY_LOOK.consulting = CATEGORY_LOOK["experts-consulting"];
+CATEGORY_LOOK["experts-consulting"] = CATEGORY_LOOK["professional-services"];
+CATEGORY_LOOK.consulting = CATEGORY_LOOK["professional-services"];
 
 const DEFAULT_LOOK = CATEGORY_LOOK.testing;
 

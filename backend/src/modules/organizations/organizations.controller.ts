@@ -10,7 +10,6 @@ import type { OrganizationAccessContext } from '../rbac/services/organization-ac
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { ListOrganizationsQueryDto } from './dto/list-organizations-query.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
-import { OrganizationMembersService } from './services/organization-members.service.js';
 import { OrganizationRolesService } from './services/organization-roles.service.js';
 import { OrganizationsService } from './services/organizations.service.js';
 
@@ -19,7 +18,6 @@ import { OrganizationsService } from './services/organizations.service.js';
 export class OrganizationsController {
   constructor(
     private readonly organizations: OrganizationsService,
-    private readonly members: OrganizationMembersService,
     private readonly roles: OrganizationRolesService,
   ) {}
 
@@ -80,12 +78,5 @@ export class OrganizationsController {
   @RequirePermission(F.memberRoles, 'view')
   compatibleRoles(@CurrentOrganization() context: OrganizationAccessContext) {
     return this.roles.listCompatibleRoles(context);
-  }
-
-  @Post(':organizationId/leave')
-  @HttpCode(HttpStatus.OK)
-  @OrganizationScoped({ requireMembership: true })
-  leave(@CurrentUser() user: AuthenticatedUser, @CurrentOrganization() context: OrganizationAccessContext) {
-    return this.members.leave(user.sub, context);
   }
 }

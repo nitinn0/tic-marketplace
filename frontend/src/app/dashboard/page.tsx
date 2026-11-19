@@ -8,11 +8,13 @@ import { ArrowRight, Building2, FileText, FlaskConical, MessageSquare, Search } 
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/common/container";
 import { HighlightCarousel, type CarouselSlide } from "@/components/dashboard/highlight-carousel";
+import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
 import { clearSession, isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 import { ActiveOrganizationCard } from "@/features/organizations/components/active-organization-card";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
+import { hasPermission, ORGANIZATION_FUNCTIONALITIES } from "@/features/organizations/utils/permissions";
 import type { BuyerRfq, MarketplaceHome } from "@/features/marketplace/types";
 
 function StatCard({ title, value, hint }: { title: string; value: string; hint: string }) {
@@ -110,6 +112,7 @@ export default function DashboardPage() {
     me?.globalRoles ??
     [];
   const permissions = activeContext?.permissions.length ? activeContext.permissions : (me?.permissions ?? []);
+  const canReviewEmailChanges = hasPermission(me?.permissions, ORGANIZATION_FUNCTIONALITIES.platformAccess, "view");
   const openRfqs = rfqs.filter((rfq) => rfq.status === "OPEN");
   const quoteCount = rfqs.reduce((total, rfq) => total + rfq.quotes.length, 0);
 
@@ -155,6 +158,8 @@ export default function DashboardPage() {
       ) : me ? (
         <div className="mt-8 space-y-8">
           <HighlightCarousel slides={slides} />
+
+          {canReviewEmailChanges ? <EmailChangeRequestsCard /> : null}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {ACTIONS.map(({ href, title, body, icon: Icon }) => (

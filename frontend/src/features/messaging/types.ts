@@ -1,6 +1,6 @@
 export type ConversationListItem = {
   id: string;
-  rfqId: string;
+  rfqId: string | null;
   rfqTitle: string;
   counterpartName: string;
   lastMessage: {
@@ -16,9 +16,9 @@ export type ConversationListItem = {
 
 export type ConversationDetail = {
   id: string;
-  rfqId: string;
+  rfqId: string | null;
   rfqTitle: string;
-  rfqStatus: string;
+  rfqStatus: string | null;
   counterpartName: string;
   lastMessageAt: string | null;
   createdAt: string;

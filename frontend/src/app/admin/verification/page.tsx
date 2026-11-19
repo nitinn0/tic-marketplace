@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { RequireAuth } from "@/components/auth/require-auth";
 import { Button } from "@/components/ui/button";
+import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
 import { api } from "@/lib/api";
 
 type AdminProvider = {
@@ -114,6 +115,10 @@ function VerificationPanel() {
         ))}
       </ul>
       {providers.length === 0 ? <p className="mt-8 text-sm text-slate-500">No providers in this filter.</p> : null}
+
+      <div className="mt-12">
+        <EmailChangeRequestsCard title="Email change requests" />
+      </div>
     </div>
   );
 }

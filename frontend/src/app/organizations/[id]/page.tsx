@@ -1,10 +1,9 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 import { Container } from "@/components/common/container";
 import { LoadingState } from "@/components/common/loading-state";
-import { routes } from "@/lib/constants";
 import { MyAccessCard } from "@/features/organizations/components/my-access-card";
 import { OrganizationAccessError, OrganizationPageHeader } from "@/features/organizations/components/organization-page-header";
 import { OrganizationProfileCard } from "@/features/organizations/components/organization-profile";
@@ -13,7 +12,6 @@ import { useOrganizations } from "@/features/organizations/hooks/use-organizatio
 import { canInOrganization, ORGANIZATION_FUNCTIONALITIES as F } from "@/features/organizations/utils/permissions";
 
 function OrganizationOverview({ organizationId }: { organizationId: string }) {
-  const router = useRouter();
   const { refresh } = useOrganizations();
   const { data: organization, error, status, loading, reload } = useOrganizationDetails(organizationId);
 
@@ -40,13 +38,7 @@ function OrganizationOverview({ organizationId }: { organizationId: string }) {
             void refresh();
           }}
         />
-        <MyAccessCard
-          organization={organization}
-          onLeft={async () => {
-            await refresh();
-            router.push(routes.organizations);
-          }}
-        />
+        <MyAccessCard organization={organization} />
       </div>
     </>
   );

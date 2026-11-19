@@ -13,6 +13,14 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum EmailChangeStatus {
+  OTP_PENDING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id              String     @id @default(uuid()) @db.Uuid
   email           String     @unique
@@ -40,6 +48,7 @@ model User {
   notifications           Notification[]
   passwordResetTokens     PasswordResetToken[]
   emailChangeTokens       EmailChangeToken[]
+  reviewedEmailChanges    EmailChangeToken[]       @relation("EmailChangeReviews")
   sentMessages            Message[]
   conversationReads       ConversationRead[]
 
@@ -655,8 +664,9 @@ model ProfessionalProfile {
   createdAt              DateTime                  @default(now()) @map("created_at")
   updatedAt              DateTime                  @updatedAt @map("updated_at")
 
-  user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  experience ProfessionalExperience[]
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experience    ProfessionalExperience[]
+  conversations Conversation[]
 
   @@index([professionalType])
   @@index([verificationStatus])
@@ -766,27 +776,31 @@ model RfqQuote {
   @@map("rfq_quotes")
 }
 
-/// 1:1 buyer–provider thread opened when a quote is awarded on an RFQ. No group chats.
+/// A thread is either an awarded RFQ chat or a company-to-independent hire inquiry.
 model Conversation {
   id                     String    @id @default(uuid()) @db.Uuid
-  rfqId                  String    @unique @map("rfq_id") @db.Uuid
-  buyerOrganizationId    String    @map("buyer_organization_id") @db.Uuid
-  providerOrganizationId String    @map("provider_organization_id") @db.Uuid
-  providerId             String    @map("provider_id") @db.Uuid
+  rfqId                  String?   @unique @map("rfq_id") @db.Uuid
+  buyerOrganizationId    String?   @map("buyer_organization_id") @db.Uuid
+  providerOrganizationId String?   @map("provider_organization_id") @db.Uuid
+  providerId             String?   @map("provider_id") @db.Uuid
+  professionalProfileId  String?   @map("professional_profile_id") @db.Uuid
   lastMessageAt          DateTime? @map("last_message_at")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  rfq                  Rfq               @relation(fields: [rfqId], references: [id], onDelete: Cascade)
-  buyerOrganization    Organization      @relation("BuyerConversations", fields: [buyerOrganizationId], references: [id], onDelete: Cascade)
-  providerOrganization Organization      @relation("ProviderConversations", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
-  provider             ProviderProfile   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  rfq                  Rfq?                 @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  buyerOrganization    Organization?        @relation("BuyerConversations", fields: [buyerOrganizationId], references: [id], onDelete: Cascade)
+  providerOrganization Organization?        @relation("ProviderConversations", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
+  provider             ProviderProfile?     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  professionalProfile  ProfessionalProfile? @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   messages             Message[]
   reads                ConversationRead[]
 
+  @@unique([providerOrganizationId, professionalProfileId], map: "conversations_hire_pair_key")
   @@index([buyerOrganizationId, lastMessageAt])
   @@index([providerOrganizationId, lastMessageAt])
   @@index([providerId])
+  @@index([professionalProfileId])
   @@map("conversations")
 }
 
@@ -853,17 +867,26 @@ model PasswordResetToken {
 }
 
 model EmailChangeToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  newEmail  String    @map("new_email")
-  otpHash   String    @map("otp_hash")
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  currentEmail     String            @map("current_email")
+  newEmail         String            @map("new_email")
+  otpHash          String            @map("otp_hash")
+  expiresAt        DateTime          @map("expires_at")
+  usedAt           DateTime?         @map("used_at")
+  status           EmailChangeStatus @default(OTP_PENDING)
+  otpVerifiedAt    DateTime?         @map("otp_verified_at")
+  reviewedByUserId String?           @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime?         @map("reviewed_at")
+  reviewNote       String?           @map("review_note")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("EmailChangeReviews", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
+  @@index([userId, status])
+  @@index([status, createdAt])
   @@index([expiresAt])
   @@map("email_change_tokens")
 }

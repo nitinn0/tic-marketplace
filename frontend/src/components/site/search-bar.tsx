@@ -31,6 +31,7 @@ const CAT_ICON: Record<string, LucideIcon> = {
   certification: ShieldCheck,
   CERTIFICATION: ShieldCheck,
   esg: Leaf,
+  "professional-services": Users,
   "experts-consulting": Users,
   CONSULTING: Users,
 };

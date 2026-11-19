@@ -12,21 +12,22 @@ class CatalogError extends Error {
 }
 
 const POPULAR_SLUGS = [
-  "water-chemical-testing",
-  "iso-9001-certification",
-  "ghg-verification",
-  "factory-inspection",
-  "iso-27001-certification",
-  "water-microbiological-testing",
-  "iso-14001-certification",
-  "supplier-audit",
+  "environmental-testing-water-quality-testing",
+  "iso-management-system-certification-iso-9001-certification",
+  "ghg-verification-ghg-inventory-verification",
+  "industrial-inspection-plant-inspection",
+  "iso-management-system-certification-iso-27001-certification",
+  "microbiological-testing-bacterial-testing",
+  "iso-management-system-certification-iso-14001-certification",
+  "supplier-audit-services-supplier-audits",
 ];
 
 const CATEGORY_TAGLINE: Record<string, string> = {
   testing: "Labs for product, material and environmental testing.",
   inspection: "On-site inspection of goods, plants and shipments.",
   certification: "Accredited certification of systems, products and people.",
-  "experts-consulting": "Auditors, verifiers and sustainability consultants.",
+  "professional-services": "Consulting, audits, training and specialized expertise.",
+  "experts-consulting": "Consulting, audits, training and specialized expertise.",
 };
 
 const TAXONOMY_PERMISSION: Record<string, string> = {

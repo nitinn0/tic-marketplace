@@ -30,6 +30,16 @@ export class ChatController {
     return this.chat.list(context, user.sub);
   }
 
+  @Post('professionals/:professionalId')
+  @HttpCode(HttpStatus.CREATED)
+  openHire(
+    @CurrentOrganization() context: OrganizationAccessContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('professionalId', ParseUUIDPipe) professionalId: string,
+  ) {
+    return this.chat.openHire(context, user.sub, professionalId);
+  }
+
   @Get(':id')
   get(
     @CurrentOrganization() context: OrganizationAccessContext,

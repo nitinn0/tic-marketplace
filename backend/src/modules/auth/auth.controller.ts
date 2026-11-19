@@ -83,6 +83,12 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('change-email/pending')
+  async myEmailChangeRequest(@Req() req: Request) {
+    return this.authService.getMyEmailChangeRequest(req.user as { sub: string });
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@Req() req: Request) {
     return this.authService.getCurrentUser(req.user as { sub: string });

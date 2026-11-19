@@ -97,7 +97,7 @@ export function Footer() {
             <li><FooterLink href={routes.services}>Testing</FooterLink></li>
             <li><FooterLink href={`${routes.services}?category=inspection`}>Inspection</FooterLink></li>
             <li><FooterLink href={`${routes.services}?category=certification`}>Certification</FooterLink></li>
-            <li><FooterLink href={`${routes.services}?category=experts-consulting`}>Consulting</FooterLink></li>
+            <li><FooterLink href={`${routes.services}?category=professional-services`}>Consulting</FooterLink></li>
           </ul>
         </nav>
 

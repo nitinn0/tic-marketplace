@@ -7,7 +7,9 @@ import { ArrowRight, ClipboardList, LogOut, MapPin, ShieldCheck, Tags } from "lu
 
 import { Container } from "@/components/common/container";
 import { Badge } from "@/components/ui/badge";
+import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
+import { hasPermission, ORGANIZATION_FUNCTIONALITIES } from "@/features/organizations/utils/permissions";
 import { ProviderBasicForm } from "@/features/providers/components/provider-basic-form";
 import { ProviderServicesPanel } from "@/features/providers/components/provider-services-panel";
 import { providersService } from "@/features/providers/services/providers.service";
@@ -84,6 +86,7 @@ export default function ProviderDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const organizationId = activeOrganization?.organizationType === "PROVIDER" ? activeOrganization.id : null;
+  const canReviewEmailChanges = hasPermission(me?.permissions, ORGANIZATION_FUNCTIONALITIES.platformAccess, "view");
 
   useEffect(() => {
     if (status === "anonymous" && !isAuthenticated()) {
@@ -208,6 +211,7 @@ export default function ProviderDashboardPage() {
           </div>
         ) : (
           <div className="space-y-8">
+            {canReviewEmailChanges ? <EmailChangeRequestsCard /> : null}
             <div className="flex gap-1 overflow-x-auto border-b border-[#EADFCF] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {tabs.map((tab) => {
                 const active = panel === tab.id;

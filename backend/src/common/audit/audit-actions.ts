@@ -30,6 +30,9 @@ export const AUDIT_ACTIONS = {
   rfqQuoteWithdrawn: 'RFQ_QUOTE_WITHDRAWN',
   providerVerified: 'PROVIDER_VERIFIED',
   providerVerificationRejected: 'PROVIDER_VERIFICATION_REJECTED',
+  emailChangeRequested: 'EMAIL_CHANGE_REQUESTED',
+  emailChangeApproved: 'EMAIL_CHANGE_APPROVED',
+  emailChangeRejected: 'EMAIL_CHANGE_REJECTED',
 } as const;
 
 export const AUDIT_ENTITIES = {
@@ -50,4 +53,5 @@ export const AUDIT_ENTITIES = {
   conversation: 'conversation',
   message: 'message',
   notification: 'notification',
+  emailChange: 'email_change_token',
 } as const;

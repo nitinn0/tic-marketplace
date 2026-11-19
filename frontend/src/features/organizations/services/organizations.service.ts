@@ -31,7 +31,6 @@ export const organizationsService = {
 
   switch: (organizationId: string) => api.post<OrganizationContext>(`${base(organizationId)}/switch`),
   context: (organizationId: string) => api.get<OrganizationContext>(`${base(organizationId)}/permissions`),
-  leave: (organizationId: string) => api.post<{ success: boolean }>(`${base(organizationId)}/leave`),
   compatibleRoles: (organizationId: string) => api.get<CompatibleRole[]>(`${base(organizationId)}/roles`),
 
   members: (organizationId: string, includeRemoved = false) =>

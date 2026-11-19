@@ -162,12 +162,19 @@ export function ChatThread({
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-[#12303A]">{conversation.counterpartName}</p>
           <p className="truncate text-xs text-[#5A6A6F]">
-            About{" "}
-            <Link href={routes.rfq(conversation.rfqId)} className="font-medium text-[#0F4C5C] hover:text-[#E36F47]">
-              {conversation.rfqTitle}
-            </Link>
+            {conversation.rfqId ? (
+              <>
+                About{" "}
+                <Link href={routes.rfq(conversation.rfqId)} className="font-medium text-[#0F4C5C] hover:text-[#E36F47]">
+                  {conversation.rfqTitle}
+                </Link>
+              </>
+            ) : (
+              conversation.rfqTitle
+            )}
           </p>
         </div>
+        {conversation.rfqId ? (
         <Link
           href={routes.rfq(conversation.rfqId)}
           className="hidden h-9 items-center gap-1.5 rounded-full border border-[#EADFCF] bg-white px-3 text-xs font-semibold text-[#0F4C5C] transition hover:border-[#7CC0C8] hover:bg-[#E8F4F5] sm:inline-flex"
@@ -175,6 +182,7 @@ export function ChatThread({
           View RFQ
           <ExternalLink className="h-3 w-3" />
         </Link>
+        ) : null}
       </header>
 
       {!bannerDismissed ? (

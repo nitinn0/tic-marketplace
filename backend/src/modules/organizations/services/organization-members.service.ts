@@ -121,11 +121,10 @@ export class OrganizationMembersService {
   }
 
   async remove(actorId: string, context: OrganizationAccessContext, memberId: string) {
-    return this.removeMembership(actorId, context, memberId, AUDIT_ACTIONS.memberRemoved);
-  }
-
-  async leave(actorId: string, context: OrganizationAccessContext) {
-    return this.removeMembership(actorId, context, context.membership!.id, AUDIT_ACTIONS.memberLeft);
+    if (!context.hasPlatformAccess) {
+      throw new ForbiddenException('Only a platform super admin can remove organization members');
+    }
+    return this.removeMembership(actorId, context, memberId);
   }
 
   async transferOwnership(actorId: string, context: OrganizationAccessContext, memberId: string) {
@@ -269,12 +268,7 @@ export class OrganizationMembersService {
     return this.listRoles(context, memberId);
   }
 
-  private async removeMembership(
-    actorId: string,
-    context: OrganizationAccessContext,
-    memberId: string,
-    action: typeof AUDIT_ACTIONS.memberRemoved | typeof AUDIT_ACTIONS.memberLeft,
-  ) {
+  private async removeMembership(actorId: string, context: OrganizationAccessContext, memberId: string) {
     const organizationId = context.organization.id;
 
     await this.prisma.$transaction(async (tx) => {
@@ -284,9 +278,7 @@ export class OrganizationMembersService {
       if (member.membershipStatus === 'REMOVED') {
         throw new BadRequestException('Member has already been removed');
       }
-      if (member.userId !== actorId) {
-        this.assertCanManageOwner(context, member);
-      }
+      this.assertCanManageOwner(context, member);
       if (
         member.isOwner &&
         member.membershipStatus === 'ACTIVE' &&
@@ -311,7 +303,7 @@ export class OrganizationMembersService {
 
       await this.audit.log(
         {
-          action,
+          action: AUDIT_ACTIONS.memberRemoved,
           entityType: AUDIT_ENTITIES.organizationMember,
           entityId: member.id,
           actorUserId: actorId,

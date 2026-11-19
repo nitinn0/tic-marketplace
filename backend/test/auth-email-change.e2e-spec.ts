@@ -38,7 +38,7 @@ describe('Auth email change (e2e)', () => {
     expect(duplicate.status).toBe(400);
   });
 
-  it('allows a non-super-admin to change email with password + OTP', async () => {
+  it('submits a verified OTP for super admin approval instead of changing email immediately', async () => {
     const user = await api.createUser('email-change-ok');
     const newEmail = `changed.${Date.now()}.${Math.random().toString(36).slice(2, 8)}@example.com`;
 
@@ -54,23 +54,61 @@ describe('Auth email change (e2e)', () => {
 
     const confirmed = await api.post<{
       message: string;
-      accessToken: string;
-      refreshToken: string;
-      user: { email: string };
+      status: string;
+      request: { id: string; newEmail: string; status: string };
     }>('/auth/change-email/confirm', user.token, { otp: requested.body.devOtp });
     expect(confirmed.status).toBe(200);
-    expect(confirmed.body.user.email).toBe(newEmail.toLowerCase());
-    expect(confirmed.body.accessToken).toBeTruthy();
+    expect(confirmed.body.status).toBe('PENDING_APPROVAL');
+    expect(confirmed.body.request.newEmail).toBe(newEmail.toLowerCase());
 
-    const me = await api.get('/auth/me', confirmed.body.accessToken);
+    const me = await api.get('/auth/me', user.token);
     expect(me.status).toBe(200);
-    expect(me.body.user.email).toBe(newEmail.toLowerCase());
+    expect(me.body.user.email).toBe(user.email.toLowerCase());
+
+    const pending = await api.get('/auth/change-email/pending', user.token);
+    expect(pending.status).toBe(200);
+    expect(pending.body.request.status).toBe('PENDING_APPROVAL');
+
+    const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
+    const approved = await api.post<{ status: string; user: { email: string } }>(
+      `/admin/email-changes/${confirmed.body.request.id}/approve`,
+      superAdmin,
+    );
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe('APPROVED');
+    expect(approved.body.user.email).toBe(newEmail.toLowerCase());
 
     const loginOld = await api.post('/auth/login', undefined, { email: user.email, password: PASSWORD });
     expect(loginOld.status).toBe(401);
 
     const loginNew = await api.post('/auth/login', undefined, { email: newEmail, password: PASSWORD });
     expect(loginNew.status).toBe(200);
+  });
+
+  it('lets super admin reject a pending email change request', async () => {
+    const user = await api.createUser('email-change-reject');
+    const newEmail = `reject.${Date.now()}@example.com`;
+
+    const requested = await api.post<{ devOtp?: string }>('/auth/change-email/request', user.token, {
+      newEmail,
+      password: PASSWORD,
+    });
+    expect(requested.status).toBe(200);
+
+    const confirmed = await api.post<{ request: { id: string } }>('/auth/change-email/confirm', user.token, {
+      otp: requested.body.devOtp,
+    });
+    expect(confirmed.status).toBe(200);
+
+    const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
+    const rejected = await api.post(`/admin/email-changes/${confirmed.body.request.id}/reject`, superAdmin, {
+      note: 'Not allowed',
+    });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.status).toBe('REJECTED');
+
+    const me = await api.get('/auth/me', user.token);
+    expect(me.body.user.email).toBe(user.email.toLowerCase());
   });
 
   it('rejects an expired OTP', async () => {
@@ -85,7 +123,7 @@ describe('Auth email change (e2e)', () => {
     expect(requested.body.devOtp).toBeTruthy();
 
     await api.prisma.emailChangeToken.updateMany({
-      where: { userId: user.id, usedAt: null },
+      where: { userId: user.id, status: 'OTP_PENDING' },
       data: { expiresAt: new Date(Date.now() - 60_000) },
     });
 

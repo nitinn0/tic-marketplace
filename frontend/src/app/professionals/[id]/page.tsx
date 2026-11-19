@@ -2,21 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { AlertCircle, ArrowLeft, BadgeCheck, MapPin } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { AlertCircle, ArrowLeft, BadgeCheck, MapPin, MessageSquare } from "lucide-react";
 
 import type { MarketplaceProfessional } from "@/features/marketplace/types";
+import { openHireConversation } from "@/features/messaging/services/chat.service";
 import { professionalTypeLabels } from "@/features/professionals/utils/labels";
 import type { ProfessionalType } from "@/features/professionals/types";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/constants";
 
 export default function ProfessionalDetailPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [professional, setProfessional] = useState<MarketplaceProfessional | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -49,7 +53,7 @@ export default function ProfessionalDetailPage() {
           className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0F4C5C] transition hover:text-[#0B3B47]"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          Back to independents
+          Back to individuals list
         </Link>
 
         {!loaded ? <div className="skeleton mt-8 h-64 rounded-3xl" /> : null}
@@ -122,9 +126,30 @@ export default function ProfessionalDetailPage() {
               </div>
             ) : null}
 
-            <div className="mt-8 rounded-2xl border border-[#E8F4F5] bg-[#E8F4F5]/50 px-4 py-3 text-sm text-[#0F4C5C]">
-              Companies can contact independents through the platform once messaging / hire workflows are enabled for
-              your organization.
+            <div className="mt-8 rounded-2xl border border-[#E8F4F5] bg-[#E8F4F5]/50 px-4 py-4">
+              <p className="text-sm text-[#0F4C5C]">
+                Message {professional.name.split(" ")[0]} to discuss the engagement. Phone numbers and emails stay blocked
+                in chat.
+              </p>
+              {chatError ? <p className="mt-2 text-sm text-red-700">{chatError}</p> : null}
+              <button
+                type="button"
+                disabled={openingChat}
+                onClick={() => {
+                  setOpeningChat(true);
+                  setChatError(null);
+                  void openHireConversation(professional.id)
+                    .then((data) => router.push(routes.message(data.id)))
+                    .catch((err: unknown) => {
+                      setChatError(err instanceof Error ? err.message : "Could not open chat");
+                      setOpeningChat(false);
+                    });
+                }}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#E36F47] px-4 py-2.5 text-sm font-semibold text-[#0B2530] shadow-[0_12px_30px_-12px_rgba(227,111,71,0.9)] transition hover:-translate-y-0.5 hover:bg-[#F2A98B] disabled:pointer-events-none disabled:opacity-50"
+              >
+                <MessageSquare className="h-4 w-4" aria-hidden />
+                {openingChat ? "Opening chat…" : "Message to hire"}
+              </button>
             </div>
           </article>
         ) : null}

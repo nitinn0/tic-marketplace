@@ -40,7 +40,7 @@ export function getMemberActions(
     remove:
       !isSelf &&
       member.membershipStatus !== "REMOVED" &&
-      canManageThisMember &&
+      organization.hasPlatformAccess &&
       canInOrganization(access, F.members, "delete"),
     manageRoles:
       !isSelf &&

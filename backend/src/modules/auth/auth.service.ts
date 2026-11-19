@@ -9,7 +9,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, randomInt } from 'node:crypto';
 
+import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../../common/audit/audit-actions.js';
+import { AuditService } from '../../common/audit/audit.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { OrganizationAccessService } from '../rbac/services/organization-access.service.js';
 import { PermissionResolverService } from '../rbac/services/permission-resolver.service.js';
 import { isRoleCompatibleWithOrganization } from '../rbac/utils/role-scope.util.js';
@@ -42,6 +45,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly organizationAccess: OrganizationAccessService,
     private readonly mail: MailService,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -166,6 +171,16 @@ export class AuthService {
 
     await this.assertCanChangeEmail(user.id);
 
+    const pendingApproval = await this.prisma.emailChangeToken.findFirst({
+      where: { userId: user.id, status: 'PENDING_APPROVAL' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (pendingApproval) {
+      throw new BadRequestException(
+        'You already have an email change request waiting for super admin approval',
+      );
+    }
+
     const newEmail = dto.newEmail.toLowerCase().trim();
     if (newEmail === user.email.toLowerCase()) {
       throw new BadRequestException('New email must be different from your current email');
@@ -187,19 +202,26 @@ export class AuthService {
 
     await this.prisma.$transaction([
       this.prisma.emailChangeToken.updateMany({
-        where: { userId: user.id, usedAt: null },
-        data: { usedAt: new Date() },
+        where: { userId: user.id, status: 'OTP_PENDING' },
+        data: { status: 'CANCELLED', usedAt: new Date() },
       }),
       this.prisma.emailChangeToken.create({
-        data: { userId: user.id, newEmail, otpHash, expiresAt },
+        data: {
+          userId: user.id,
+          currentEmail: user.email,
+          newEmail,
+          otpHash,
+          expiresAt,
+          status: 'OTP_PENDING',
+        },
       }),
     ]);
 
     await this.mail.send({
       to: newEmail,
       subject: 'Confirm your new TIC Marketplace email',
-      text: `Your email change code is ${otp}. It expires in 10 minutes.\n`,
-      html: `<p>Your email change code is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
+      text: `Your email change code is ${otp}. It expires in 10 minutes.\nAfter you enter the code, a platform super admin must approve the change.\n`,
+      html: `<p>Your email change code is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p><p>After you enter the code, a platform super admin must approve the change.</p>`,
     });
 
     return {
@@ -217,7 +239,12 @@ export class AuthService {
     await this.assertCanChangeEmail(user.id);
 
     const candidates = await this.prisma.emailChangeToken.findMany({
-      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      where: {
+        userId: user.id,
+        status: 'OTP_PENDING',
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       orderBy: { createdAt: 'desc' },
       take: 5,
     });
@@ -239,31 +266,62 @@ export class AuthService {
       throw new BadRequestException('An account with this email already exists');
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const nextUser = await tx.user.update({
-        where: { id: user.id },
-        data: { email: pending.newEmail, emailVerifiedAt: new Date() },
+    const request = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.emailChangeToken.update({
+        where: { id: pending.id },
+        data: {
+          status: 'PENDING_APPROVAL',
+          usedAt: new Date(),
+          otpVerifiedAt: new Date(),
+        },
       });
-      await tx.emailChangeToken.update({ where: { id: pending.id }, data: { usedAt: new Date() } });
       await tx.emailChangeToken.updateMany({
-        where: { userId: user.id, usedAt: null },
-        data: { usedAt: new Date() },
+        where: { userId: user.id, status: 'OTP_PENDING', id: { not: pending.id } },
+        data: { status: 'CANCELLED', usedAt: new Date() },
       });
-      await tx.refreshToken.updateMany({
-        where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-      return nextUser;
+      return updated;
     });
 
-    const tokens = await this.createTokens(updated.id, updated.email);
-    await this.storeRefreshToken(updated.id, tokens.refreshToken);
+    await this.audit.log({
+      action: AUDIT_ACTIONS.emailChangeRequested,
+      entityType: AUDIT_ENTITIES.emailChange,
+      entityId: request.id,
+      actorUserId: user.id,
+      targetUserId: user.id,
+      metadata: { currentEmail: request.currentEmail, newEmail: request.newEmail },
+    });
 
     return {
-      message: 'Email updated successfully.',
-      user: this.publicUser(updated),
-      ...tokens,
+      message: 'Request sent to super admin for email change approval.',
+      status: 'PENDING_APPROVAL' as const,
+      request: {
+        id: request.id,
+        currentEmail: request.currentEmail,
+        newEmail: request.newEmail,
+        status: request.status,
+        createdAt: request.createdAt,
+      },
     };
+  }
+
+  async getMyEmailChangeRequest(requestUser: { sub: string }) {
+    const request = await this.prisma.emailChangeToken.findFirst({
+      where: {
+        userId: requestUser.sub,
+        status: { in: ['OTP_PENDING', 'PENDING_APPROVAL'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        currentEmail: true,
+        newEmail: true,
+        status: true,
+        createdAt: true,
+        otpVerifiedAt: true,
+        expiresAt: true,
+      },
+    });
+    return { request };
   }
 
   private async assertCanChangeEmail(userId: string) {

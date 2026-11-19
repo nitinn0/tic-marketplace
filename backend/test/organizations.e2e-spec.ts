@@ -266,9 +266,12 @@ describe('Organizations (e2e)', () => {
       expect(response.status).toBe(400);
     });
 
-    it('removes a member by status change without deleting the row', async () => {
+    it('blocks org admins from removing members; only super admin can kick', async () => {
       const memberId = await api.memberId(orgId, invitee.id);
-      expect((await api.delete(`/organizations/${orgId}/members/${memberId}`, owner.token)).status).toBe(200);
+      expect((await api.delete(`/organizations/${orgId}/members/${memberId}`, owner.token)).status).toBe(403);
+
+      const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
+      expect((await api.delete(`/organizations/${orgId}/members/${memberId}`, superAdmin)).status).toBe(200);
 
       const row = await api.prisma.organizationUser.findUniqueOrThrow({ where: { id: memberId }, include: { roles: true } });
       expect(row.membershipStatus).toBe('REMOVED');
@@ -290,8 +293,9 @@ describe('Organizations (e2e)', () => {
         roleId: await api.roleId('PROVIDER_USER'),
       });
       const pendingMemberId = await api.memberId(orgId, pendingUser.id);
+      const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
 
-      expect((await api.delete(`/organizations/${orgId}/members/${pendingMemberId}`, owner.token)).status).toBe(200);
+      expect((await api.delete(`/organizations/${orgId}/members/${pendingMemberId}`, superAdmin)).status).toBe(200);
       const accept = await api.post('/organization-invitations/accept', pendingUser.token, { token: invite.body.devToken });
       expect(accept.status).toBe(410);
       expect((await api.get(`/organizations/${orgId}`, pendingUser.token)).status).toBe(403);
@@ -459,9 +463,8 @@ describe('Organizations (e2e)', () => {
       expect(owners.map((entry) => entry.userId)).toEqual([owner.id]);
     });
 
-    it('the last active owner cannot leave or be removed', async () => {
-      const leave = await api.post(`/organizations/${orgId}/leave`, owner.token);
-      expect(leave.status).toBe(409);
+    it('the last active owner cannot be removed or suspended', async () => {
+      expect((await api.post(`/organizations/${orgId}/leave`, owner.token)).status).toBe(404);
 
       const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
       expect((await api.delete(`/organizations/${orgId}/members/${ownerMemberId}`, superAdmin)).status).toBe(409);
@@ -518,16 +521,20 @@ describe('Organizations (e2e)', () => {
       expect(audit?.metadata).toMatchObject({ fromUserIds: [owner.id], toUserId: admin.id });
     });
 
-    it('the former owner keeps their role and can now leave', async () => {
+    it('the former owner keeps their role and cannot self-leave', async () => {
       const details = await api.get(`/organizations/${orgId}`, owner.token);
       expect(details.body.membership.isOwner).toBe(false);
       expect(details.body.membership.roles.map((role: { code: string }) => role.code)).toEqual(['BUYER_ADMIN']);
 
-      expect((await api.post(`/organizations/${orgId}/leave`, owner.token)).status).toBe(200);
+      expect((await api.post(`/organizations/${orgId}/leave`, owner.token)).status).toBe(404);
+      expect((await api.get(`/organizations/${orgId}`, owner.token)).status).toBe(200);
+
+      const superAdmin = await api.login(DEMO_USERS.superAdmin.email);
+      expect((await api.delete(`/organizations/${orgId}/members/${ownerMemberId}`, superAdmin)).status).toBe(200);
       expect((await api.get(`/organizations/${orgId}`, owner.token)).status).toBe(403);
       expect(
-        await api.prisma.auditLog.count({ where: { action: AUDIT_ACTIONS.memberLeft, organizationId: orgId } }),
-      ).toBe(1);
+        await api.prisma.auditLog.count({ where: { action: AUDIT_ACTIONS.memberRemoved, organizationId: orgId, targetUserId: owner.id } }),
+      ).toBeGreaterThanOrEqual(1);
     });
 
     it('serializes concurrent removals so an owner always remains', async () => {

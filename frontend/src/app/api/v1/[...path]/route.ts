@@ -17,7 +17,9 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
     const proxied = await proxyToNest(request, joined);
     if (proxied.status !== 404) return proxied;
     const preview = await proxied.clone().text();
-    if (!/Cannot GET|Cannot POST|Not Found/i.test(preview)) return proxied;
+    const missingRoute = /Cannot GET|Cannot POST|Cannot PUT|Cannot PATCH|Cannot DELETE|Not Found/i.test(preview);
+    // Terms acceptance and logout must still run locally when this Nest build has no such route.
+    if (!missingRoute && joined !== "auth/terms/accept" && joined !== "auth/logout") return proxied;
   } catch {
     // Nest may be down — use the in-process Next handlers when available.
   }

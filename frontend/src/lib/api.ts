@@ -1,3 +1,5 @@
+import { clearSession } from "@/lib/auth";
+
 declare global {
   interface Window {
     __TIC_API_URL__?: string;
@@ -156,8 +158,21 @@ async function tryRefreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}, didRefresh = false): Promise<T> {
-  const apiBaseUrl = getApiBaseUrl();
+function isMissingHttpRoute(status: number, body: string) {
+  return status === 404 && /Cannot (GET|POST|PUT|PATCH|DELETE)\b/i.test(body);
+}
+
+function sameOriginApiBase() {
+  return "/api/v1";
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  didRefresh = false,
+  baseOverride?: string,
+): Promise<T> {
+  const apiBaseUrl = (baseOverride ?? getApiBaseUrl()).replace(/\/$/, "");
   if (!apiBaseUrl) {
     throw new Error(
       "API is not configured. Set NEXT_PUBLIC_API_URL to your Nest API base (…/api/v1) for this deployment.",
@@ -186,7 +201,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, didRefres
   if (response.status === 401 && !didRefresh && !endpoint.startsWith("/auth/")) {
     const refreshed = await tryRefreshSession();
     if (refreshed) {
-      return request<T>(endpoint, options, true);
+      return request<T>(endpoint, options, true, baseOverride);
     }
     window.localStorage.removeItem("tic_access_token");
     window.localStorage.removeItem("tic_refresh_token");
@@ -199,6 +214,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}, didRefres
 
   if (!response.ok) {
     const text = await response.text();
+    if (!baseOverride && !apiBaseUrl.startsWith("/") && isMissingHttpRoute(response.status, text)) {
+      try {
+        return await request<T>(endpoint, options, didRefresh, sameOriginApiBase());
+      } catch {
+        // Keep the original "Cannot POST …" error when the same-origin handler cannot take over.
+      }
+    }
     let message = text || `Request failed with status ${response.status}`;
     try {
       const parsed = JSON.parse(text) as { message?: string | string[] };
@@ -223,16 +245,42 @@ async function request<T>(endpoint: string, options: RequestInit = {}, didRefres
 export async function logoutRemote() {
   const refreshToken = getStoredRefreshToken();
   const apiBaseUrl = getApiBaseUrl();
-  if (!refreshToken || !apiBaseUrl || usesSupabaseAuth()) return;
+  if (!refreshToken || !apiBaseUrl) return;
   try {
-    await fetch(`${apiBaseUrl}/auth/logout`, {
+    await fetch(`${apiBaseUrl.replace(/\/$/, "")}/auth/logout`, {
       method: "POST",
+      keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),
     });
   } catch {
     // Local clear still happens.
   }
+}
+
+let signOutStarted = false;
+
+/** Drop the local session immediately, then revoke it in the background. */
+export function signOutAndRedirect(loginPath = "/login") {
+  if (typeof window === "undefined" || signOutStarted) return;
+  signOutStarted = true;
+
+  const refreshToken = getStoredRefreshToken();
+  const apiBaseUrl = getApiBaseUrl();
+  if (refreshToken && apiBaseUrl) {
+    void fetch(`${apiBaseUrl.replace(/\/$/, "")}/auth/logout`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => undefined);
+  }
+
+  void import("@/lib/supabase-auth")
+    .then(({ signOut }) => signOut())
+    .catch(() => undefined);
+  clearSession();
+  window.location.replace(loginPath);
 }
 
 export const api = {

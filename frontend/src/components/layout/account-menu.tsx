@@ -21,7 +21,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
-import { clearSession, getStoredSession, type SessionUser } from "@/lib/auth";
+import { signOutAndRedirect } from "@/lib/api";
+import { getStoredSession, type SessionUser } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -149,14 +150,8 @@ export function AccountMenu() {
                   <button
                     type="button"
                     className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-[#A8431F] transition hover:bg-[#FDEEE6]"
-                    onClick={() => {
-                      void import("@/lib/api").then(({ logoutRemote }) =>
-                        logoutRemote().finally(() => {
-                          clearSession();
-                          window.location.href = routes.login;
-                        }),
-                      );
-                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={() => signOutAndRedirect(routes.login)}
                   >
                     Sign out
                   </button>

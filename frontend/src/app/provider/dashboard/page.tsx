@@ -21,8 +21,8 @@ import {
   profileVerificationTones,
 } from "@/features/providers/utils/labels";
 import { formatMoney, type ProviderRfq } from "@/features/marketplace/types";
-import { ApiError, api } from "@/lib/api";
-import { clearSession, isAuthenticated } from "@/lib/auth";
+import { ApiError, api, signOutAndRedirect } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -184,10 +184,7 @@ export default function ProviderDashboardPage() {
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10"
-              onClick={() => {
-                clearSession();
-                window.location.href = routes.login;
-              }}
+              onClick={() => signOutAndRedirect(routes.login)}
             >
               <LogOut className="h-4 w-4" aria-hidden />
               Log out

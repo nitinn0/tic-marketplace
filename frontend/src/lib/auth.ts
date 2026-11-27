@@ -58,6 +58,11 @@ export function clearSession() {
   window.localStorage.removeItem("tic_refresh_token");
   window.localStorage.removeItem("tic_user");
   window.localStorage.removeItem("tic_active_organization_id");
+  for (const key of Object.keys(window.localStorage)) {
+    if (key.startsWith("sb-") && key.includes("auth-token")) {
+      window.localStorage.removeItem(key);
+    }
+  }
 }
 
 export function isAuthenticated() {

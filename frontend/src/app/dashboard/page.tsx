@@ -10,8 +10,8 @@ import { Container } from "@/components/common/container";
 import { HighlightCarousel, type CarouselSlide } from "@/components/dashboard/highlight-carousel";
 import { EmailChangeRequestsCard } from "@/features/admin/components/email-change-requests-card";
 import { ProviderVerificationCard } from "@/features/admin/components/provider-verification-card";
-import { clearSession, isAuthenticated } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { api, signOutAndRedirect } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 import { ActiveOrganizationCard } from "@/features/organizations/components/active-organization-card";
 import { useOrganizations } from "@/features/organizations/hooks/use-organizations";
@@ -131,8 +131,7 @@ export default function DashboardPage() {
   }, [home]);
 
   const handleLogout = () => {
-    clearSession();
-    window.location.href = "/login";
+    signOutAndRedirect(routes.login);
   };
 
   return (

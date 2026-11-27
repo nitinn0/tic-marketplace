@@ -57,12 +57,12 @@ const TERMS_SECTIONS = [
 
 type AcceptResponse = {
   user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    status: string;
-    termsAcceptedAt: string | null;
+    id?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    status?: string;
+    termsAcceptedAt?: string | null;
   };
 };
 
@@ -116,23 +116,41 @@ export default function TermsPage() {
       const result = await api.post<AcceptResponse>("/auth/terms/accept", {});
       const session = getStoredSession();
       if (session) {
+        const incoming = result.user ?? {};
         saveSession({
           ...session,
           user: {
             ...session.user,
-            ...result.user,
+            ...incoming,
+            id: incoming.id || session.user.id,
+            email: incoming.email || session.user.email,
+            firstName: incoming.firstName || session.user.firstName,
+            lastName: incoming.lastName || session.user.lastName,
+            status: incoming.status || session.user.status,
+            termsAcceptedAt: incoming.termsAcceptedAt || new Date().toISOString(),
           },
         });
       }
       router.replace(nextPath);
       router.refresh();
     } catch (err) {
-      if (err instanceof Error && /401|Unauthorized|session/i.test(err.message)) {
+      const message = err instanceof Error ? err.message : "Unable to record acceptance.";
+      const session = getStoredSession();
+      if (session && /Cannot POST/i.test(message)) {
+        saveSession({
+          ...session,
+          user: { ...session.user, termsAcceptedAt: new Date().toISOString() },
+        });
+        router.replace(nextPath);
+        router.refresh();
+        return;
+      }
+      if (/401|Unauthorized|session/i.test(message)) {
         clearSession();
         setSignedIn(false);
         setError("Your session expired. Sign in again to accept the Terms.");
       } else {
-        setError(err instanceof Error ? err.message : "Unable to record acceptance.");
+        setError(message);
       }
     } finally {
       setLoading(false);

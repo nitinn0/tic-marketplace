@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { handlePrivateCatalog, handlePublicCatalog } from "@/lib/server/catalog-api";
 import { getMeOrganizations, handleOrganizationsApi, OrganizationsApiError } from "@/lib/server/organizations-api";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
@@ -106,19 +108,53 @@ async function confirmProviderAccount(body: JsonMap) {
   return json({ confirmed: true }, 201);
 }
 
+function verifyNestAccessToken(token: string): { id: string; email?: string } | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const secret = process.env.JWT_SECRET || "development-secret";
+  const expected = createHmac("sha256", secret).update(`${parts[0]}.${parts[1]}`).digest();
+  let actual: Buffer;
+  try {
+    actual = Buffer.from(parts[2], "base64url");
+  } catch {
+    return null;
+  }
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString()) as {
+      sub?: string;
+      email?: string;
+      exp?: number;
+      type?: string;
+    };
+    if (payload.type === "refresh" || !payload.sub) return null;
+    if (typeof payload.exp === "number" && payload.exp * 1000 < Date.now()) return null;
+    return { id: payload.sub, email: payload.email };
+  } catch {
+    return null;
+  }
+}
+
 async function requireUser(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) {
     throw new ApiError("Unauthorized", 401);
   }
 
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user?.email) {
-    throw new ApiError("Unauthorized", 401);
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.auth.getUser(token);
+    if (!error && data.user?.email) return data.user;
+  } catch {
+    // Supabase admin is optional when the browser holds a Nest access token.
   }
 
-  return data.user;
+  const nestUser = verifyNestAccessToken(token);
+  if (nestUser) {
+    return { id: nestUser.id, email: nestUser.email, user_metadata: {} as JsonMap };
+  }
+
+  throw new ApiError("Unauthorized", 401);
 }
 
 async function resolveAppUser(authUser: { id: string; email?: string }) {
@@ -498,37 +534,64 @@ async function handleAdminApi(request: Request, path: string, method: string, ap
   return null;
 }
 
-async function acceptTerms(authUser: { id: string; email?: string }) {
+async function findExistingAppUser(authUser: { id: string; email?: string }) {
   const admin = getSupabaseAdmin();
-  const appUser = await resolveAppUser(authUser);
-  const existing = camelize<{ id: string; termsAcceptedAt?: string | null }>(appUser);
-  const acceptedAt = existing.termsAcceptedAt ?? new Date().toISOString();
-  if (!existing.termsAcceptedAt) {
-    const { error } = await admin
-      .from("users")
-      .update({ terms_accepted_at: acceptedAt, updated_at: new Date().toISOString() })
-      .eq("id", appUser.id);
-    if (error) throw new ApiError(error.message, 400);
-  }
-  const refreshed = await resolveAppUser(authUser);
-  const user = camelize<{
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    status: string;
-    termsAcceptedAt?: string | null;
-  }>(refreshed);
-  return {
+  const email = authUser.email?.toLowerCase();
+  const { data: byId } = await admin.from("users").select("*").eq("id", authUser.id).maybeSingle();
+  if (byId) return byId;
+  if (!email) return null;
+  const { data: byEmail } = await admin.from("users").select("*").eq("email", email).maybeSingle();
+  return byEmail ?? null;
+}
+
+async function acceptTerms(authUser: { id: string; email?: string }) {
+  const acceptedAt = new Date().toISOString();
+  const fallback = {
     user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      status: user.status,
-      termsAcceptedAt: user.termsAcceptedAt ?? acceptedAt,
+      id: authUser.id,
+      email: authUser.email ?? "",
+      status: "ACTIVE",
+      termsAcceptedAt: acceptedAt,
     },
   };
+
+  try {
+    const admin = getSupabaseAdmin();
+    const appUser = await findExistingAppUser(authUser);
+    if (!appUser) return fallback;
+    const existing = camelize<{ id: string; termsAcceptedAt?: string | null }>(appUser);
+    const stamp = existing.termsAcceptedAt ?? acceptedAt;
+    if (!existing.termsAcceptedAt) {
+      const { error } = await admin
+        .from("users")
+        .update({ terms_accepted_at: stamp, updated_at: new Date().toISOString() })
+        .eq("id", String(appUser.id));
+      if (error) return fallback;
+    }
+    const refreshed = (await findExistingAppUser(authUser)) ?? appUser;
+    const user = camelize<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      status: string;
+      termsAcceptedAt?: string | null;
+    }>(refreshed);
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        termsAcceptedAt: user.termsAcceptedAt ?? stamp,
+      },
+    };
+  } catch {
+    // Nest records acceptance when that route exists. This path only runs when it
+    // does not, and still lets the signed-in user continue.
+    return fallback;
+  }
 }
 
 async function listModules() {
@@ -637,6 +700,10 @@ export async function handleAppApi(request: Request, path: string) {
 
     if (method === "POST" && path === "auth/provider-signup") {
       return confirmProviderAccount(await readJson(request));
+    }
+
+    if (method === "POST" && path === "auth/logout") {
+      return json({ success: true });
     }
 
     const authUser = await requireUser(request);

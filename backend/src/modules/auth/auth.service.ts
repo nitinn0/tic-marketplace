@@ -149,12 +149,16 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    const token = await this.validateRefreshToken(refreshToken, false);
-    if (token) {
-      await this.prisma.refreshToken.update({
-        where: { id: token.id },
-        data: { revokedAt: new Date() },
-      });
+    try {
+      const token = await this.validateRefreshToken(refreshToken, false);
+      if (token && !token.revokedAt) {
+        await this.prisma.refreshToken.update({
+          where: { id: token.id },
+          data: { revokedAt: new Date() },
+        });
+      }
+    } catch {
+      // Expired or unknown tokens are already unusable. Sign-out must still succeed.
     }
 
     return { success: true };
